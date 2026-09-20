@@ -412,3 +412,48 @@ interpolating between the turn's before and after snapshots. Section 21 says
 rendering speed must never determine game state: the orchestrator resolves a
 turn as fast as the agents allow, and the UI then spends a fixed wall-clock
 budget animating it. The renderer only ever reads state.
+
+---
+
+## A24 — The serverless functions are bundled, not traced
+
+**Context:** two production outages in a row, both from the same root cause,
+both invisible locally.
+
+1. `FUNCTION_INVOCATION_FAILED`. A3 has workspace packages export
+   `./src/index.ts`. Vite and Vitest resolve that happily; Node throws
+   `ERR_UNKNOWN_FILE_EXTENSION`, because it cannot execute TypeScript.
+2. A non-JSON `HTTP 500`. Vercel does not bundle a function's dependencies,
+   it traces the import graph and copies what it thinks is needed. With npm
+   workspaces those are symlinks into the repo, and whether the right files
+   land in the lambda depends on resolution behaviour we cannot see, cannot
+   test, and only learn about from production.
+
+**Decision:** stop relying on tracing. `scripts/build-vercel.ts` emits the
+documented **Build Output API** layout, and bundles each handler into a
+single self-contained file with no imports left to resolve except Node
+builtins. Nothing is traced, so nothing can be missed.
+
+Consequences:
+
+- Handlers live in `apps/server/src/api/`, matching the tree in section 5.
+  There is no top-level `api/`, so Vercel's zero-config detection cannot
+  produce a second, competing definition of the same route. A test asserts
+  the directory stays absent.
+- `vercel.json` no longer sets `outputDirectory` or `functions`; both would
+  conflict with `.vercel/output`. A test asserts they stay unset.
+- An unmatched `/api/*` returns a JSON 404 rather than the SPA shell.
+  Serving HTML to a `fetch()` is what turned the second failure into a
+  confusing "non-JSON response" instead of a clear status.
+
+**The real lesson, and the actual fix:** both outages shipped because the
+functions were verified by _building_ them. Building proves the code
+compiles. Only running proves it loads. So there are now two commands that
+run the built artifacts:
+
+- `npm run verify:functions` loads each bundle out of `.vercel/output` and
+  invokes it, asserting that no key yields a classified JSON 503 and a bad
+  key yields a classified JSON 401 from the real provider.
+- `npm run serve:output` serves the whole deployment over HTTP with Vercel's
+  routing, so the deployed behaviour can be curl-ed before deploying. Unlike
+  `vercel dev` it needs no account, login or project link.

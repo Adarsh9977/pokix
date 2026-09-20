@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -35,7 +35,8 @@ describe("workspace configuration", () => {
 describe("deployment configuration", () => {
   const vercel = JSON.parse(read("vercel.json")) as {
     buildCommand: string;
-    outputDirectory: string;
+    outputDirectory?: string;
+    functions?: unknown;
   };
 
   it("builds with a script that actually exists", () => {
@@ -43,14 +44,20 @@ describe("deployment configuration", () => {
     expect(rootPackageJson.scripts).toHaveProperty(script);
   });
 
-  it("points its output directory at the web app's build output", () => {
-    // The failure this guards against: the build emits one place and Vercel
-    // looks in another, which only shows up as a failed deploy.
-    expect(vercel.outputDirectory).toBe("apps/web/dist");
-    const webPackage = JSON.parse(read("apps/web/package.json")) as {
-      scripts: Record<string, string>;
-    };
-    expect(webPackage.scripts.build).toBe("vite build");
+  it("leaves output layout to the Build Output API, not to zero-config", () => {
+    // outputDirectory and functions must be absent: setting either would
+    // conflict with the .vercel/output the build writes.
+    expect(vercel.outputDirectory).toBeUndefined();
+    expect(vercel.functions).toBeUndefined();
+    expect(vercel.buildCommand).toBe("npm run build");
+  });
+
+  it("writes the Build Output API as the last step of the build", () => {
+    const build = rootPackageJson.scripts.build ?? "";
+    expect(build).toContain("scripts/build-vercel.ts");
+    expect(build.indexOf("@jev-arena/web")).toBeLessThan(
+      build.indexOf("scripts/build-vercel.ts"),
+    );
   });
 
   it("has a web app with an entry point for Vite to build", () => {
@@ -90,23 +97,30 @@ describe("deployment configuration", () => {
     );
   });
 
-  it("gives the serverless functions exactly one workspace import", () => {
-    // Each additional bare workspace import is another package that has to
-    // ship runnable JavaScript. Funnelling them through @jev-arena/server
-    // keeps that surface at one.
-    for (const file of ["api/decide.ts", "api/config.ts"]) {
-      const source = read(file);
-      const imports = [...source.matchAll(/from "(@jev-arena\/[^"]+)"/g)].map(
-        (match) => match[1],
-      );
-      expect(new Set(imports), file).toEqual(new Set(["@jev-arena/server"]));
+  it("has no top-level api/ directory for Vercel to auto-detect", () => {
+    // The handlers live in apps/server/src/api and are bundled explicitly.
+    // A stray top-level api/ would be picked up by zero-config detection
+    // as well, giving two competing definitions of the same route.
+    expect(existsSync(join(repoRoot, "api"))).toBe(false);
+  });
+
+  it("keeps the handlers with the rest of the server code", () => {
+    for (const file of [
+      "apps/server/src/api/decide.ts",
+      "apps/server/src/api/config.ts",
+    ]) {
+      expect(existsSync(join(repoRoot, file)), file).toBe(true);
     }
   });
 
-  it("keeps the decision endpoint where Vercel looks for functions", () => {
-    const api = join(repoRoot, "api/decide.ts");
-    expect(existsSync(api)).toBe(true);
-    expect(statSync(api).isFile()).toBe(true);
+  it("builds a function for every handler, with none left behind", () => {
+    // A handler that exists but is never listed in the build script would
+    // simply 404 in production, with nothing to indicate why.
+    const script = read("scripts/build-vercel.ts");
+    const listed = script.match(/const FUNCTIONS = \[([^\]]+)\]/)?.[1] ?? "";
+    for (const name of ["decide", "config"]) {
+      expect(listed, `FUNCTIONS should include ${name}`).toContain(`"${name}"`);
+    }
   });
 
   it("never ships the API key to the browser", () => {

@@ -9,7 +9,7 @@
  * the key, or anything derived from it.
  */
 
-import { hasApiKey, loadAgentMode } from "@jev-arena/server";
+import { hasApiKey, loadAgentMode } from "../config/env";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export interface ArenaClientConfig {

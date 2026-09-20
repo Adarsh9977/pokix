@@ -9,6 +9,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/build/**",
       "**/coverage/**",
+      // Generated deployment artifacts: bundled output, not source.
+      ".vercel/**",
     ],
   },
   js.configs.recommended,

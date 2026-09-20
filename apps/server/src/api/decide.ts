@@ -14,14 +14,13 @@
  * here. See docs/ASSUMPTIONS.md A23.
  */
 
-import { ArenaError } from "@jev-arena/types";
-import type { AgentObservation } from "@jev-arena/types";
-import {
-  JevAgent,
-  createTypeSafeGateway,
-  hasApiKey,
-  loadTypeSafeConfig,
-} from "@jev-arena/server";
+// Relative imports only. This file is bundled into a single self-contained
+// function by scripts/build-vercel.ts, so nothing is left for the runtime to
+// resolve. See docs/ASSUMPTIONS.md A24.
+import { ArenaError, type AgentObservation } from "@jev-arena/types";
+import { JevAgent } from "../agents/jev-agent";
+import { hasApiKey, loadTypeSafeConfig } from "../config/env";
+import { createTypeSafeGateway } from "../typesafe/gateway";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 /** Reused across warm invocations so the SDK client is not rebuilt per call. */
