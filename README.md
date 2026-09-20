@@ -50,7 +50,7 @@ plan and `docs/ASSUMPTIONS.md` for every decision that goes beyond the spec.
 | ---------------------------------- | ----- |
 | Repository bootstrap               | done  |
 | Game domain types                  | done  |
-| Deterministic game engine          | todo  |
+| Deterministic game engine        | done  |
 | Mock agents                        | todo  |
 | Simultaneous decision orchestrator | todo  |
 | Jev playground                     | todo  |
