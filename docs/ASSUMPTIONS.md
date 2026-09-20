@@ -329,3 +329,33 @@ questions the playground exists to answer.
 **Decision:** It does, by firing two requests at once. That is two extra small
 requests; `--minimal` skips them. A match depends on this working, so it is
 worth proving before the match is built.
+
+---
+
+## A22 — Vercel config (a knowing deviation from section 4)
+
+**Spec:** Section 4 says "Do NOT add deployment infrastructure."
+
+**What happened:** A Vercel project was connected to the repository outside
+of this plan. It ran `npm run build`, which is a typecheck and emits nothing,
+then failed looking for an output directory. Every push now fails.
+
+**Decision:** Add the minimum to make that stop, and record it as a deviation
+rather than pretending it is in scope.
+
+- `vercel.json` pins `buildCommand` to `npm run build` and `outputDirectory`
+  to `public`. Keeping the real build as the build command means a broken
+  typecheck still fails the deploy, so this is a small CI gate rather than
+  dead weight.
+- `public/index.html` is a single dependency-free page. It states plainly
+  that there is no playable build yet, and sets the visual direction section
+  20 asks for (dark, neon, strong silhouettes, clean type).
+
+The ordering the spec cares about is untouched: no frontend framework, no
+`apps/web`, no game code on the client. At spec commit 11 the real Vite app
+lands and this becomes `outputDirectory: "apps/web/dist"`, with the
+placeholder deleted.
+
+`tests/repository.test.ts` now asserts the build command is a real script and
+the output directory exists, so this class of failure is caught by `npm test`
+instead of by a failed deploy.
