@@ -154,3 +154,57 @@ and B in the input cannot change the output.
 
 Movement conflicts are resolved symmetrically: if both players target the same
 tile, neither moves.
+
+---
+
+## A11 — The observation carries a few derived facts
+
+**Spec:** Section 10 gives a starting shape for `AgentObservation` and says
+fog of war and friends come later.
+
+**Decision:** The spec's fields are all present. Four things are added:
+
+- `stateVersion`, because section 23 requires every decision to be tied to one
+  and the agent has to have seen it.
+- `self.id` / `enemy.id`, so an ATTACK can name a target without the agent
+  guessing who it is.
+- `legalMoveDirections` / `legalDodgeDirections`, computed by the real
+  validator rather than a second copy of the rules. These become the option
+  lists for Jev's direction questions, so an illegal direction is never even
+  offered.
+- `distanceToEnemy`, `attackRange`, `enemyInAttackRange`.
+
+The last group matters for the model, not for us. A System One model should be
+judging, not doing arithmetic; precomputing the distance removes a calculation
+from a question that should only be about intent. `environment` also carries
+`width`/`height`, since obstacles alone do not tell an agent where the walls
+are.
+
+Everything here is observed fact or arithmetic over observed fact. Enemy energy
+is deliberately _not_ included.
+
+---
+
+## A12 — Mock decisions report no confidence
+
+**Spec:** Section 15's illustrative `MockAgent` returns `{ action, confidence: 1 }`,
+but the same section says the confidence structure "should not pretend to
+represent real Jev confidence".
+
+**Decision:** `AgentDecision.confidence` is optional and mock agents omit it.
+A fabricated 1.0 would be indistinguishable from a genuinely certain model
+answer in the HUD and in the analytics. `AgentDecision.origin` (`mock` |
+`model` | `fallback`) says where the decision came from, so the UI can label it
+honestly.
+
+---
+
+## A13 — Where the async match loop lives
+
+**Spec:** Commit 4 is "mock agents"; commit 5 is the orchestrator.
+
+**Decision:** Commit 4 ships the minimum async loop needed for `npm run simulate`
+to exist at all: one snapshot, both agents asked through `Promise.all`, resolve
+when both answer. Commit 5 layers on what the spec assigns to it — stale
+rejection, timeouts, configurable fallbacks and decision traces — rather than
+rewriting the loop.

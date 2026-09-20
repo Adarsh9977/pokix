@@ -7,6 +7,7 @@
  */
 
 export * from "./actions";
+export * from "./observations";
 export * from "./resolver";
 export * from "./rules";
 export * from "./simulation";

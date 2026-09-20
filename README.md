@@ -50,8 +50,8 @@ plan and `docs/ASSUMPTIONS.md` for every decision that goes beyond the spec.
 | ---------------------------------- | ----- |
 | Repository bootstrap               | done  |
 | Game domain types                  | done  |
-| Deterministic game engine        | done  |
-| Mock agents                        | todo  |
+| Deterministic game engine          | done  |
+| Mock agents                        | done  |
 | Simultaneous decision orchestrator | todo  |
 | Jev playground                     | todo  |
 | JevAgent adapter                   | todo  |
@@ -74,6 +74,8 @@ cp .env.example .env   # then fill in TYPESAFE_API_KEY when you have one
 npm test
 npm run lint
 npm run build
+
+npm run simulate        # watch a full match between two local agents
 ```
 
 `npm test`, `npm run lint` and `npm run build` never touch the network and never
@@ -105,6 +107,7 @@ logged, printed, bundled, or sent to the browser. `.env` is git-ignored;
 | Script                 | What it does                                            |
 | ---------------------- | ------------------------------------------------------- |
 | `npm test`             | Runs the offline test suite                             |
+| `npm run simulate`     | Plays a full local match and prints it. No API calls    |
 | `npm run test:watch`   | Runs the test suite in watch mode                       |
 | `npm run test:live`    | Also runs the opt-in live TypeSafe API tests            |
 | `npm run typecheck`    | Typechecks every workspace                              |
@@ -113,8 +116,11 @@ logged, printed, bundled, or sent to the browser. `.env` is git-ignored;
 | `npm run format`       | Prettier, write mode                                    |
 | `npm run format:check` | Prettier, check mode                                    |
 
-More scripts (`simulate`, `jev:playground`, `match`, `dev`) arrive with the
-milestones that implement them. This table only lists commands that exist today.
+`npm run simulate passive` plays two agents that only defend, which is a quick
+way to check the turn limit. `--quiet` skips the per-turn output.
+
+More scripts (`jev:playground`, `match`, `dev`) arrive with the milestones that
+implement them. This table only lists commands that exist today.
 
 ## License
 

@@ -8,5 +8,7 @@
 
 export * from "./actions";
 export * from "./config";
+export * from "./decision";
 export * from "./geometry";
+export * from "./observation";
 export * from "./state";
