@@ -14,13 +14,16 @@
  * here. See docs/ASSUMPTIONS.md A23.
  */
 
-import { ArenaError } from "@jev-arena/types";
-import type { AgentObservation } from "@jev-arena/types";
+// Exactly one workspace import, deliberately. `@jev-arena/server` ships a
+// bundled `dist/index.js`, so nothing here resolves to raw TypeScript at
+// runtime - which Node cannot execute. See ASSUMPTIONS A24.
 import {
+  ArenaError,
   JevAgent,
   createTypeSafeGateway,
   hasApiKey,
   loadTypeSafeConfig,
+  type AgentObservation,
 } from "@jev-arena/server";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 

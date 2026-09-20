@@ -20,6 +20,16 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
 
+    // tsx resolves these when running the CLI scripts, so `npm run match`
+    // and friends execute TypeScript source rather than a stale bundle.
+    "baseUrl": ".",
+    "paths": {
+      "@jev-arena/types": ["./packages/types/src/index.ts"],
+      "@jev-arena/game-core": ["./packages/game-core/src/index.ts"],
+      "@jev-arena/agent-core": ["./packages/agent-core/src/index.ts"],
+      "@jev-arena/server": ["./apps/server/src/index.ts"]
+    },
+
     "noEmit": true
   },
   "include": [

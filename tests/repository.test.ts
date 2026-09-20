@@ -63,6 +63,46 @@ describe("deployment configuration", () => {
     }
   });
 
+  it("never asks Node to import raw TypeScript at runtime", () => {
+    // The bug this exists to prevent: workspace packages pointed `exports`
+    // at `./src/index.ts`. Vite and Vitest resolve that happily, but Node
+    // cannot load `.ts` and Vercel traces dependencies rather than bundling
+    // them, so every serverless invocation died with
+    // ERR_UNKNOWN_FILE_EXTENSION before reaching any of our code.
+    //
+    // Any package a Vercel function imports must resolve to real JavaScript
+    // for the runtime, whatever it resolves to for the typechecker.
+    const server = JSON.parse(read("apps/server/package.json")) as {
+      exports: { ".": { types: string; default: string } };
+      scripts?: Record<string, string>;
+    };
+
+    expect(server.exports["."].default).toMatch(/\.js$/);
+    expect(server.exports["."].default).not.toMatch(/\.tsx?$/);
+    expect(server.scripts?.build).toBeDefined();
+  });
+
+  it("builds the server bundle before the web app, so the functions have it", () => {
+    const build = rootPackageJson.scripts.build ?? "";
+    expect(build).toContain("@jev-arena/server");
+    expect(build.indexOf("@jev-arena/server")).toBeLessThan(
+      build.indexOf("@jev-arena/web"),
+    );
+  });
+
+  it("gives the serverless functions exactly one workspace import", () => {
+    // Each additional bare workspace import is another package that has to
+    // ship runnable JavaScript. Funnelling them through @jev-arena/server
+    // keeps that surface at one.
+    for (const file of ["api/decide.ts", "api/config.ts"]) {
+      const source = read(file);
+      const imports = [...source.matchAll(/from "(@jev-arena\/[^"]+)"/g)].map(
+        (match) => match[1],
+      );
+      expect(new Set(imports), file).toEqual(new Set(["@jev-arena/server"]));
+    }
+  });
+
   it("keeps the decision endpoint where Vercel looks for functions", () => {
     const api = join(repoRoot, "api/decide.ts");
     expect(existsSync(api)).toBe(true);
@@ -70,19 +110,32 @@ describe("deployment configuration", () => {
   });
 
   it("never ships the API key to the browser", () => {
-    // Anything under apps/web/src is bundled and served publicly. The key
-    // must not be referenced there at all, not even via import.meta.env.
+    // Anything under apps/web/src is bundled and served publicly.
+    //
+    // This checks that no key is ever *read*, rather than that the string
+    // "TYPESAFE_API_KEY" never appears. Naming the variable in help text is
+    // fine and useful - "this deployment has no TYPESAFE_API_KEY" is exactly
+    // what a user needs to be told. Reading its value is what must not
+    // happen, so that is what is asserted.
     const files = [
       "apps/web/src/App.tsx",
       "apps/web/src/main.tsx",
       "apps/web/src/game/use-match.ts",
       "apps/web/src/game/remote-jev-agent.ts",
     ];
+
     for (const file of files) {
       const source = read(file);
-      expect(source, file).not.toContain("TYPESAFE_API_KEY");
-      expect(source, file).not.toContain("apiKey");
+      // No environment access of any kind: Vite inlines these at build time,
+      // so anything read here is baked into a public asset.
+      expect(source, file).not.toMatch(/import\.meta\.env/);
+      expect(source, file).not.toMatch(/process\.env/);
+      // No provider client, and no credential-shaped identifier.
       expect(source, file).not.toContain("@typesafe-ai/sdk");
+      expect(source, file).not.toMatch(/\bapiKey\b/);
+      expect(source, file).not.toMatch(/Bearer\s/);
+      // No direct calls to the provider: the browser talks to /api only.
+      expect(source, file).not.toContain("api.typesafe.ai");
     }
   });
 

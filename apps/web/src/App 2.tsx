@@ -151,8 +151,8 @@ export default function App() {
           {match.mode === "jev" && (
             <em>
               The match keeps running — the engine substitutes DEFEND when an
-              agent cannot answer. Switch to Local agents to play without an
-              API key.
+              agent cannot answer. Switch to Local agents to play without an API
+              key.
             </em>
           )}
         </div>
