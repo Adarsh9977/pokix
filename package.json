@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",
-    "build": "npm run typecheck && npm run build -w @jev-arena/web",
+    "build": "npm run typecheck && npm run build -w @jev-arena/server && npm run build -w @jev-arena/web",
     "dev": "npm run dev -w @jev-arena/web",
     "simulate": "tsx scripts/simulate.ts",
     "jev:playground": "tsx scripts/jev-playground.ts",
