@@ -1,0 +1,16 @@
+{
+  "name": "@jev-arena/agent-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Agent abstraction and deterministic local agents. The seam the game engine meets a decision-maker at; knows nothing about TypeSafe.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@jev-arena/game-core": "*",
+    "@jev-arena/types": "*"
+  }
+}
