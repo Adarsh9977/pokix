@@ -7,7 +7,9 @@
  * engine decides whether it actually happens.
  */
 
+import { isDirection } from "./geometry";
 import type { Direction } from "./geometry";
+import { isPlayerId } from "./state";
 import type { PlayerId } from "./state";
 
 export const ACTION_TYPES = ["MOVE", "ATTACK", "DEFEND", "DODGE"] as const;
@@ -40,6 +42,33 @@ export function isActionType(value: unknown): value is ActionType {
     typeof value === "string" &&
     (ACTION_TYPES as readonly string[]).includes(value)
   );
+}
+
+/**
+ * Structural validity only: is this the right *shape* to be an Action?
+ *
+ * Says nothing about whether the game rules would allow it. That is the
+ * engine's job. This exists so an adapter can reject a malformed response
+ * from outside the process before it ever reaches the engine.
+ */
+export function isAction(value: unknown): value is Action {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as {
+    type?: unknown;
+    direction?: unknown;
+    target?: unknown;
+  };
+  switch (candidate.type) {
+    case "MOVE":
+    case "DODGE":
+      return isDirection(candidate.direction);
+    case "ATTACK":
+      return isPlayerId(candidate.target);
+    case "DEFEND":
+      return true;
+    default:
+      return false;
+  }
 }
 
 export function move(direction: Direction): MoveAction {

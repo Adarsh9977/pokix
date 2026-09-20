@@ -208,3 +208,53 @@ to exist at all: one snapshot, both agents asked through `Promise.all`, resolve
 when both answer. Commit 5 layers on what the spec assigns to it — stale
 rejection, timeouts, configurable fallbacks and decision traces — rather than
 rewriting the loop.
+
+---
+
+## A14 — There is no default decision timeout
+
+**Spec:** Section 22 asks for a configurable `decisionTimeoutMs` and says
+explicitly: "Do not hard-code a timeout without measuring actual behavior."
+
+**Decision:** `decisionTimeoutMs` defaults to `undefined`, meaning wait
+indefinitely. That is correct for local agents, and for live runs it forces
+the value to be supplied by a caller who has measured. A number will be
+chosen once the playground reports real Jev latency, and it will be recorded
+here with the measurement that justified it.
+
+The fallback is `DEFEND` by default and is configurable, per section 22.
+
+---
+
+## A15 — Two extra error categories
+
+**Spec:** Section 46 lists eleven categories.
+
+**Decision:** All eleven exist. `PROVIDER_ERROR` is added as the landing spot
+for a provider failure we have not classified, so that an unrecognised throw
+is still categorised rather than silently becoming something it is not.
+
+`isRetryableCategory` treats only `RATE_LIMIT_ERROR` and `NETWORK_ERROR` as
+retryable, following the TypeSafe docs: 429 and 529 are the documented
+retry-with-backoff cases. Retrying a bad key or a malformed request is just a
+slower way to fail.
+
+---
+
+## A16 — Structural validity vs game legality
+
+**Spec:** Sections 11 and 46 both touch on bad agent output without drawing
+the line.
+
+**Decision:** Two different checks, in two different places.
+
+- The orchestrator rejects _structurally_ invalid output: something that is
+  not an `Action` at all, such as `{ type: "TELEPORT" }`. That is an
+  `INVALID_RESPONSE` and the agent gets the fallback.
+- The engine rejects _illegal_ actions: a well-formed ATTACK from out of
+  range. That is not a failure. It is a legitimate thing for an agent to
+  attempt, it is recorded as a game-level rejection, and it collapses to
+  DEFEND.
+
+Conflating them would either let malformed data reach the engine or would
+report an ordinary tactical mistake as a provider error.

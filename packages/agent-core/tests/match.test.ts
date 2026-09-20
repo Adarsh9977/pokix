@@ -10,7 +10,7 @@ import {
 import { createInitialState } from "@jev-arena/game-core";
 import { describe, expect, it } from "vitest";
 import type { Agent } from "../src/agent";
-import { runAgentMatch } from "../src/match";
+import { runAgentMatch } from "../src/orchestrator";
 import { HeuristicAgent, MockAgent } from "../src/mock-agents";
 
 const adjacent: GameConfig = {

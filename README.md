@@ -52,7 +52,7 @@ plan and `docs/ASSUMPTIONS.md` for every decision that goes beyond the spec.
 | Game domain types                  | done  |
 | Deterministic game engine          | done  |
 | Mock agents                        | done  |
-| Simultaneous decision orchestrator | todo  |
+| Simultaneous decision orchestrator | done  |
 | Jev playground                     | todo  |
 | JevAgent adapter                   | todo  |
 | Jev-vs-Jev CLI match               | todo  |
