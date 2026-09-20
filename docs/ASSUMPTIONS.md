@@ -88,3 +88,69 @@ docs to win over the spec's own guesses.
 The spec's illustrative `{ "action": "ATTACK", "probability": 0.91 }` shape is
 therefore produced by _our_ adapter from the documented Choice answer, not taken
 from the wire.
+
+---
+
+## A8 — Game balance constants
+
+**Spec:** Section 8 fixes the arena at 20x20, the action set at four actions,
+and the rules as "deterministic". Section 26 requires a neutral game. It does
+not give HP, damage, energy or range numbers.
+
+**Decision:** All of it lives in `DEFAULT_GAME_CONFIG` so it can be tuned in
+one place and varied per experiment.
+
+| Value         | Setting       | Why                                                                                                                                          |
+| ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| HP / Energy   | 100 / 100     | Round numbers that read well as HUD bars.                                                                                                    |
+| Attack damage | 12            | ~9 clean hits to kill: long enough for tactics to show.                                                                                      |
+| Attack range  | 2 (manhattan) | Range 1 makes every fight a shoving match. 2 leaves room to approach, trade, and disengage. Manhattan matches the four-directional movement. |
+| Attack energy | 15            | Affordable, but spamming attacks runs you dry.                                                                                               |
+| Dodge energy  | 20            | Strictly more than attacking, so evasion is a real trade.                                                                                    |
+| Move energy   | 0             | Repositioning should never be punished.                                                                                                      |
+| Energy regen  | 8/turn        | Slower than attack cost, so sustained aggression forces a pause.                                                                             |
+| DEFEND        | -50% damage   | Cheap, always available, never as good as a clean dodge.                                                                                     |
+| Grazed DODGE  | -25% damage   | A dodge that fails to break range still helps a little.                                                                                      |
+| Max turns     | 60            | Bounds a live match to ~120 Jev calls. Higher HP wins; equal HP draws.                                                                       |
+
+Every damage number stays an integer (12 -> 6 defended, 9 grazed), so there is
+no floating-point drift in the authoritative state.
+
+Starting positions are (6,10) and (13,10): mirror-symmetric, 7 tiles apart, so
+agents engage after about three turns instead of spending credits walking.
+
+Obstacles are mirror-symmetric about the centre line, and the horizontal
+corridor the players start on is left open, so a match can reach contact
+without pathfinding.
+
+---
+
+## A9 — Dodge is spatial, not a dice roll
+
+**Spec:** Section 8 — "DODGE can avoid an incoming attack according to
+deterministic game rules". It does not say which rules, and Section 8 forbids
+randomness.
+
+**Decision:** A DODGE moves the player one tile, like a MOVE. An incoming
+attack is negated entirely if the dodge leaves the attacker's range, and
+reduced by 25% if it does not. So dodging correctly is a question of geometry
+the agent can actually reason about, and there is no hidden dice roll.
+
+This also settles when range is checked. An ATTACK is _validated_ against the
+state the agent saw, but _connects_ based on positions after movement resolves.
+Without that, dodging could never work.
+
+---
+
+## A10 — Turn resolution order
+
+**Spec:** Section 9 requires simultaneous, order-independent resolution.
+
+**Decision:** Both actions are resolved against one frozen snapshot, in fixed
+phases: validate, pay energy, resolve movement, resolve damage, regenerate
+energy, check win condition. Because damage for both players is computed from
+the same post-movement positions before either HP total is written, swapping A
+and B in the input cannot change the output.
+
+Movement conflicts are resolved symmetrically: if both players target the same
+tile, neither moves.

@@ -49,7 +49,7 @@ plan and `docs/ASSUMPTIONS.md` for every decision that goes beyond the spec.
 | Milestone                          | State |
 | ---------------------------------- | ----- |
 | Repository bootstrap               | done  |
-| Game domain types                  | todo  |
+| Game domain types                  | done  |
 | Deterministic game engine          | todo  |
 | Mock agents                        | todo  |
 | Simultaneous decision orchestrator | todo  |
