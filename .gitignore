@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / tooling caches
+coverage/
+.vitest/
+.eslintcache
+.npm-cache/
+
+# Generated match artifacts (replays are reproducible, not source)
+recordings/
+artifacts/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
