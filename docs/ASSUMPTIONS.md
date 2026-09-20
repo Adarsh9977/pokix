@@ -359,3 +359,56 @@ placeholder deleted.
 `tests/repository.test.ts` now asserts the build command is a real script and
 the output directory exists, so this class of failure is caught by `npm test`
 instead of by a failed deploy.
+
+**Superseded by A23:** the placeholder is gone; `apps/web` is the real output.
+
+---
+
+## A23 — Frontend built early, and where the authoritative state lives
+
+**Spec:** Section 19 and rule 2 of section 52 put the frontend last, after
+commits 9 and 10. Section 50 says the authoritative game state exists on the
+server and the client is never trusted.
+
+**What happened:** A playable deployed build was requested directly.
+
+**Decision on ordering:** `apps/web` is built now, out of order. The two
+things the spec was protecting against have already happened, so the risk it
+was guarding is spent: the simulation works and is covered by 280+ tests, and
+the Jev integration exists behind an adapter with a playground to prove it.
+The frontend is a renderer over an engine that was finished first, which is
+the outcome the ordering rule wanted. Commits 9 (replay) and 10 (streaming
+API) are still outstanding and come next.
+
+**Decision on authority:** the engine runs in the browser, and
+`/api/decide` is a stateless translator: observation in, typed decision out.
+It holds no match state.
+
+This is a genuine deviation from "the authoritative game state exists on the
+server", and the reason is that the alternatives are worse here. Holding
+server-side match state needs either a database (section 4 forbids one) or
+round-tripping the whole state through the client (which section 50 forbids
+trusting). Vercel functions are stateless by nature.
+
+What the deviation does _not_ cost:
+
+- The API key never reaches the browser. That is the part of section 50 that
+  actually matters, and it is enforced by tests asserting the web bundle
+  contains no SDK import, no key reference and no provider URL.
+- Jev still cannot mutate state. `/api/decide` returns an _intention_; the
+  engine in the tab validates it exactly like a local agent's, and rejects it
+  if the rules say so. The endpoint cannot produce an illegal move because it
+  does not decide legality.
+- Determinism is untouched. The engine is the same package the CLI and the
+  tests use.
+
+What it does cost: a user who tampers with their own client can mislead only
+themselves. There is no multiplayer, no persistence, no score and no
+adversary, so there is nothing to gain by it. If any of those change, the
+authoritative loop moves server-side behind the section 10 streaming API.
+
+**Decision on rendering:** a 2D canvas, drawn on `requestAnimationFrame` and
+interpolating between the turn's before and after snapshots. Section 21 says
+rendering speed must never determine game state: the orchestrator resolves a
+turn as fast as the agents allow, and the UI then spends a fixed wall-clock
+budget animating it. The renderer only ever reads state.

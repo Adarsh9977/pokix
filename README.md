@@ -54,10 +54,11 @@ plan and `docs/ASSUMPTIONS.md` for every decision that goes beyond the spec.
 | Mock agents                        | done  |
 | Simultaneous decision orchestrator | done  |
 | Jev playground                     | done  |
-| JevAgent adapter                   | todo  |
-| Jev-vs-Jev CLI match               | todo  |
+| JevAgent adapter                   | done  |
+| Jev-vs-Jev CLI match               | done  |
+| Playable web arena                 | done  |
 | Recording and replay               | todo  |
-| Backend API and frontend           | todo  |
+| Fog of war, analytics, polish      | todo  |
 
 ## Requirements
 
@@ -75,10 +76,13 @@ npm test
 npm run lint
 npm run build
 
-npm run simulate        # watch a full match between two local agents
-
-npm run jev:playground  # check your TypeSafe setup (needs a key, spends a little)
+npm run dev             # open http://localhost:5173 and press Start
 ```
+
+That's the whole setup for the playable version. **No API key needed** — it
+opens in Local agents mode, which is deterministic, instant and free.
+
+To watch real Jev agents fight, see [Playing with Jev agents](#playing-with-jev-agents).
 
 `npm test`, `npm run lint` and `npm run build` never touch the network and never
 spend TypeSafe credits.
@@ -111,7 +115,9 @@ logged, printed, bundled, or sent to the browser. `.env` is git-ignored;
 | ------------------------ | ------------------------------------------------------- |
 | `npm test`               | Runs the offline test suite                             |
 | `npm run simulate`       | Plays a full local match and prints it. No API calls    |
+| `npm run dev`            | Starts the playable web arena on :5173                  |
 | `npm run jev:playground` | Verifies your TypeSafe/Jev setup end to end             |
+| `npm run match`          | Plays a full Jev-vs-Jev match in the terminal           |
 | `npm run test:watch`     | Runs the test suite in watch mode                       |
 | `npm run test:live`      | Also runs the opt-in live TypeSafe API tests            |
 | `npm run typecheck`      | Typechecks every workspace                              |
@@ -122,9 +128,57 @@ logged, printed, bundled, or sent to the browser. `.env` is git-ignored;
 
 `npm run simulate passive` plays two agents that only defend, which is a quick
 way to check the turn limit. `--quiet` skips the per-turn output.
+`npm run match -- --mock --turns=5` is a short, free version of the match CLI.
 
-More scripts (`match`, `dev`) arrive with the milestones that implement them.
-This table only lists commands that exist today.
+## Playing the game
+
+```bash
+npm run dev
+```
+
+Open <http://localhost:5173>.
+
+- **Start** runs the match. **Pause** stops between turns, **Step** plays
+  exactly one turn, **Reset** starts over.
+- **Speed** changes only how long each turn is animated. It cannot change the
+  outcome — the simulation and the renderer are independent.
+- **Replay** scrubs back through turns already played. It reads recorded
+  decisions and never re-asks an agent, so scrubbing costs nothing.
+- The side panels show each agent's decision, the probability distribution it
+  chose from, its confidence, and the measured latency.
+
+### Playing with Jev agents
+
+Local mode needs nothing. For real Jev agents you need a key and a running
+function to hold it, because the key must never reach the browser.
+
+```bash
+cp .env.example .env          # paste your key into TYPESAFE_API_KEY=
+npm i -g vercel               # once
+vercel dev                    # serves the app and /api/decide together
+```
+
+Then open the URL `vercel dev` prints and switch to **Jev agents**.
+
+Plain `npm run dev` also works for Jev mode as long as `vercel dev` is running
+on port 3000; Vite proxies `/api` to it.
+
+Cost: two Jev requests per turn, one per agent. A full match is at most 120.
+
+## Deployment
+
+The app deploys to Vercel as a static build plus one serverless function.
+
+- `apps/web` builds to `apps/web/dist` and is served as static files.
+- `api/decide.ts` is the only thing that talks to TypeSafe.
+
+To enable Jev mode on a deployment, add `TYPESAFE_API_KEY` in **Vercel →
+Project → Settings → Environment Variables** and redeploy. Without it the
+site still works: Local agents mode is fully playable, and Jev mode reports a
+clear `CONFIGURATION_ERROR` instead of failing silently.
+
+The browser never receives the key. There is a test asserting the web bundle
+contains no SDK import, no key reference and no provider URL.
 
 ## The Jev playground
 
@@ -162,17 +216,18 @@ the switch is unset. Everything above the SDK boundary is tested against a
 fake gateway rather than mocked HTTP, so the default run cannot spend a credit
 even by accident.
 
-## Deployment
+## Architecture note
 
-There is no playable build yet. The spec builds the simulation first and the
-frontend last, so `public/index.html` is a static status page and nothing
-more. `vercel.json` keeps `npm run build` as the build command, so a broken
-typecheck still fails the deploy.
+The game engine runs in the browser. `/api/decide` is a stateless translator:
+an observation goes in, a typed decision comes out. It holds no match state
+and cannot change the game — it returns an _intention_, and the engine
+validates that intention exactly like a local agent's.
 
-When `apps/web` lands, `outputDirectory` becomes `apps/web/dist` and the
-placeholder is deleted. See `docs/ASSUMPTIONS.md` A22 — this is a recorded
-deviation from the spec's "no deployment infrastructure" rule, added because
-a Vercel project was already connected to the repo.
+That is a deliberate, documented deviation from the spec's "authoritative
+state lives on the server", taken because the alternatives need either a
+database (forbidden) or trusting client-supplied state (also forbidden).
+See `docs/ASSUMPTIONS.md` A23 for the full reasoning and what it does and
+does not cost.
 
 ## License
 

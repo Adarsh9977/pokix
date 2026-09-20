@@ -26,3 +26,6 @@ artifacts/
 Thumbs.db
 *.swp
 .idea/
+
+# Vercel
+.vercel

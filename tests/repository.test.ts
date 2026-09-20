@@ -43,25 +43,59 @@ describe("deployment configuration", () => {
     expect(rootPackageJson.scripts).toHaveProperty(script);
   });
 
-  it("points at an output directory that is really there", () => {
-    // The exact failure this guards against: Vercel ran the build, the build
-    // emitted nothing, and the deploy died looking for a directory that did
-    // not exist. A unit test is a cheaper place to find that out.
-    const output = join(repoRoot, vercel.outputDirectory);
-    expect(existsSync(output)).toBe(true);
-    expect(statSync(output).isDirectory()).toBe(true);
+  it("points its output directory at the web app's build output", () => {
+    // The failure this guards against: the build emits one place and Vercel
+    // looks in another, which only shows up as a failed deploy.
+    expect(vercel.outputDirectory).toBe("apps/web/dist");
+    const webPackage = JSON.parse(read("apps/web/package.json")) as {
+      scripts: Record<string, string>;
+    };
+    expect(webPackage.scripts.build).toBe("vite build");
   });
 
-  it("serves an index page from the output directory", () => {
-    expect(
-      existsSync(join(repoRoot, vercel.outputDirectory, "index.html")),
-    ).toBe(true);
+  it("has a web app with an entry point for Vite to build", () => {
+    for (const file of [
+      "apps/web/index.html",
+      "apps/web/src/main.tsx",
+      "apps/web/vite.config.ts",
+    ]) {
+      expect(existsSync(join(repoRoot, file)), file).toBe(true);
+    }
   });
 
-  it("keeps the placeholder honest about there being no game yet", () => {
-    const page = read("public/index.html").toLowerCase();
-    expect(page).toContain("placeholder");
-    expect(page).not.toContain("play now");
+  it("keeps the decision endpoint where Vercel looks for functions", () => {
+    const api = join(repoRoot, "api/decide.ts");
+    expect(existsSync(api)).toBe(true);
+    expect(statSync(api).isFile()).toBe(true);
+  });
+
+  it("never ships the API key to the browser", () => {
+    // Anything under apps/web/src is bundled and served publicly. The key
+    // must not be referenced there at all, not even via import.meta.env.
+    const files = [
+      "apps/web/src/App.tsx",
+      "apps/web/src/main.tsx",
+      "apps/web/src/game/use-match.ts",
+      "apps/web/src/game/remote-jev-agent.ts",
+    ];
+    for (const file of files) {
+      const source = read(file);
+      expect(source, file).not.toContain("TYPESAFE_API_KEY");
+      expect(source, file).not.toContain("apiKey");
+      expect(source, file).not.toContain("@typesafe-ai/sdk");
+    }
+  });
+
+  it("keeps the TypeSafe SDK out of the web app's dependencies", () => {
+    const webPackage = JSON.parse(read("apps/web/package.json")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(Object.keys(webPackage.dependencies)).not.toContain(
+      "@typesafe-ai/sdk",
+    );
+    expect(Object.keys(webPackage.dependencies)).not.toContain(
+      "@jev-arena/server",
+    );
   });
 });
 

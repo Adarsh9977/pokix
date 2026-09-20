@@ -13,8 +13,9 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",
+    "build": "npm run typecheck && npm run build -w @jev-arena/web",
+    "dev": "npm run dev -w @jev-arena/web",
     "simulate": "tsx scripts/simulate.ts",
     "jev:playground": "tsx scripts/jev-playground.ts",
     "match": "tsx scripts/match.ts",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^20.19.9",
+    "@vercel/node": "^5.1.14",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
