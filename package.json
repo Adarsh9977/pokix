@@ -17,6 +17,7 @@
     "build": "npm run typecheck",
     "simulate": "tsx scripts/simulate.ts",
     "jev:playground": "tsx scripts/jev-playground.ts",
+    "match": "tsx scripts/match.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "RUN_LIVE_JEV_TESTS=true vitest run",

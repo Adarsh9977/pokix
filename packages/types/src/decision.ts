@@ -36,6 +36,16 @@ export interface AgentDecision {
   readonly confidence?: number;
   /** The full distribution over action types, when available. */
   readonly probabilities?: Readonly<Partial<Record<ActionType, number>>>;
+  /**
+   * Provider metadata, when the decision came from one.
+   *
+   * The orchestrator copies these into the DecisionTrace. It cannot discover
+   * them itself, because it deliberately knows nothing about providers.
+   */
+  readonly model?: string;
+  readonly providerRequestId?: string;
+  /** Latency the adapter measured, which excludes orchestrator overhead. */
+  readonly providerLatencyMs?: number;
 }
 
 /**
