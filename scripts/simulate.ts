@@ -9,7 +9,10 @@
 import {
   DEFAULT_GAME_CONFIG,
   PLAYER_IDS,
+  STRATEGY_PROFILES,
+  STRATEGY_PROFILE_IDS,
   describeAction,
+  isStrategyProfileId,
   type GameConfig,
   type PlayerId,
 } from "@jev-arena/types";
@@ -77,21 +80,29 @@ function printTurn(record: AgentTurnRecord, config: GameConfig): void {
   }
 }
 
-function agentFor(id: PlayerId, mode: string): Agent {
-  if (mode === "passive")
+function agentFor(id: PlayerId, profile: string): Agent {
+  if (profile === "passive") {
     return new MockAgent({ type: "DEFEND" }, `Passive ${id}`);
+  }
+  const resolved = isStrategyProfileId(profile) ? profile : "neutral";
   return new HeuristicAgent({
+    profile: resolved,
     maxHp: DEFAULT_GAME_CONFIG.player.maxHp,
-    name: `Heuristic ${id}`,
+    maxEnergy: DEFAULT_GAME_CONFIG.player.maxEnergy,
+    name: `${STRATEGY_PROFILES[resolved].label} ${id}`,
   });
 }
 
 async function main(): Promise<void> {
-  const mode = process.argv[2] ?? "heuristic";
+  // Different profiles by default. Two identical agents starting
+  // mirror-symmetrically always draw - a good neutrality property, and a
+  // deeply boring thing to watch.
+  const profileA = process.argv[2] ?? "aggressive";
+  const profileB = process.argv[3] ?? "tactical";
   const verbose = !process.argv.includes("--quiet");
   const config = DEFAULT_GAME_CONFIG;
 
-  const agents = { A: agentFor("A", mode), B: agentFor("B", mode) };
+  const agents = { A: agentFor("A", profileA), B: agentFor("B", profileB) };
 
   console.log("==============================================");
   console.log("            JEV ARENA :: SIMULATION");
@@ -99,6 +110,9 @@ async function main(): Promise<void> {
   console.log(`  Agents      ${agents.A.name}  vs  ${agents.B.name}`);
   console.log(`  Arena       ${config.arena.width}x${config.arena.height}`);
   console.log(`  Turn limit  ${config.maxTurns}`);
+  console.log(
+    `  Profiles    ${STRATEGY_PROFILE_IDS.join(", ")}  (pass two as arguments)`,
+  );
   console.log("  API calls   0 (local agents only)");
 
   let last: AgentTurnRecord | undefined;

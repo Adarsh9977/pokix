@@ -40,6 +40,8 @@ export interface EnvironmentState {
   readonly width: number;
   readonly height: number;
   readonly obstacles: readonly Position[];
+  /** Tiles that restore energy to whoever ends a turn standing on them. */
+  readonly energyNodes: readonly Position[];
 }
 
 export interface GameState {

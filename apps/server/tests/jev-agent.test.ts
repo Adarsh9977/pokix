@@ -95,7 +95,34 @@ describe("the state sent to the model", () => {
       yourAttackRange: 2,
       enemyIsWithinYourReach: true,
       youAreWithinEnemyReach: true,
+      clearLineOfFire: true,
+      enemyIsShieldedByCover: false,
     });
+  });
+
+  it("tells the model about cover separately from distance", () => {
+    // "They are close but I have no shot" needs a different answer from
+    // "they are too far away", so it is stated as its own fact rather than
+    // folded into reach.
+    const behindPillar = buildDecisionState(
+      look({ x: 8, y: 6 }, { x: 10, y: 6 }, {}, DEFAULT_GAME_CONFIG),
+    );
+    const tactical = behindPillar.tactical as Record<string, unknown>;
+    expect(tactical.clearLineOfFire).toBe(false);
+    expect(tactical.enemyIsShieldedByCover).toBe(true);
+    expect(tactical.enemyIsWithinYourReach).toBe(false);
+  });
+
+  it("tells the model where the nearest power nodes are", () => {
+    const power = state.power as {
+      youAreStandingOnAPowerNode: boolean;
+      nearestNodes: { distance: number }[];
+    };
+    expect(power.youAreStandingOnAPowerNode).toBe(false);
+    expect(power.nearestNodes.length).toBeGreaterThan(0);
+    // Sorted, so "the nearest one" needs no comparison by the model.
+    const distances = power.nearestNodes.map((n) => n.distance);
+    expect([...distances].sort((a, b) => a - b)).toEqual(distances);
   });
 
   it("never leaks the enemy's energy, which the observation never had", () => {

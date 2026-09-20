@@ -18,7 +18,7 @@ import {
   type GameState,
   type PlayerId,
 } from "@jev-arena/types";
-import { energyCostOf, isWithinAttackRange } from "./rules";
+import { hasLineOfSight, energyCostOf, isWithinAttackRange } from "./rules";
 import { isInsideArena, isObstacle } from "./state";
 
 export const INVALID_ACTION_REASONS = [
@@ -26,6 +26,7 @@ export const INVALID_ACTION_REASONS = [
   "OUT_OF_BOUNDS",
   "BLOCKED_TILE",
   "OUT_OF_RANGE",
+  "NO_LINE_OF_SIGHT",
   "INSUFFICIENT_ENERGY",
   "SELF_TARGET",
 ] as const;
@@ -114,6 +115,15 @@ export function validateAction(
         return reject(
           "OUT_OF_RANGE",
           `Player ${playerId} cannot attack ${action.target}: the target is out of range (max ${config.combat.attackRange}).`,
+        );
+      }
+      if (
+        config.combat.requiresLineOfSight &&
+        !hasLineOfSight(player.position, target.position, state.environment)
+      ) {
+        return reject(
+          "NO_LINE_OF_SIGHT",
+          `Player ${playerId} cannot attack ${action.target}: an obstacle is in the way.`,
         );
       }
       return VALID;

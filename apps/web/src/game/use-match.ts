@@ -9,8 +9,10 @@
 
 import {
   DEFAULT_GAME_CONFIG,
+  STRATEGY_PROFILES,
   type GameConfig,
   type PlayerId,
+  type StrategyProfileId,
 } from "@jev-arena/types";
 import {
   HeuristicAgent,
@@ -33,16 +35,33 @@ export interface MatchError {
 
 const TURN_ANIMATION_MS = 520;
 
-function buildAgents(mode: AgentMode): Record<PlayerId, Agent> {
+export type Profiles = Record<PlayerId, StrategyProfileId>;
+
+/**
+ * Different profiles by default.
+ *
+ * Two identical policies starting mirror-symmetrically fight to an exact
+ * draw. That is a good property to have proven, and a dull thing to put in
+ * front of someone.
+ */
+export const DEFAULT_PROFILES: Profiles = { A: "aggressive", B: "tactical" };
+
+function buildAgents(
+  mode: AgentMode,
+  profiles: Profiles,
+): Record<PlayerId, Agent> {
+  const label = (id: PlayerId) =>
+    `${mode === "jev" ? "Jev" : "Local"} · ${id} · ${STRATEGY_PROFILES[profiles[id]].label}`;
+
   if (mode === "jev") {
     return {
-      A: new RemoteJevAgent({ name: "Jev · A", profile: "neutral" }),
-      B: new RemoteJevAgent({ name: "Jev · B", profile: "neutral" }),
+      A: new RemoteJevAgent({ name: label("A"), profile: profiles.A }),
+      B: new RemoteJevAgent({ name: label("B"), profile: profiles.B }),
     };
   }
   return {
-    A: new HeuristicAgent({ name: "Local · A" }),
-    B: new HeuristicAgent({ name: "Local · B" }),
+    A: new HeuristicAgent({ name: label("A"), profile: profiles.A }),
+    B: new HeuristicAgent({ name: label("B"), profile: profiles.B }),
   };
 }
 
@@ -62,7 +81,9 @@ export interface UseMatch {
    * Lets the UI say so before you press Start, rather than after.
    */
   readonly jevAvailable: boolean | undefined;
+  readonly profiles: Profiles;
   setMode(mode: AgentMode): void;
+  setProfile(id: PlayerId, profile: StrategyProfileId): void;
   setSpeed(speed: number): void;
   setViewIndex(index: number): void;
   start(): void;
@@ -79,28 +100,31 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
   const [error, setError] = useState<MatchError | undefined>();
   const [speed, setSpeed] = useState(1);
   const [jevAvailable, setJevAvailable] = useState<boolean | undefined>();
+  const [profiles, setProfiles] = useState<Profiles>(DEFAULT_PROFILES);
 
   const orchestratorRef = useRef<MatchOrchestrator | null>(null);
   const runningRef = useRef(false);
   const modeRef = useRef(mode);
   const speedRef = useRef(speed);
   const followRef = useRef(true);
+  const profilesRef = useRef(profiles);
 
   modeRef.current = mode;
   speedRef.current = speed;
+  profilesRef.current = profiles;
 
-  const agentNames = useMemo<Record<PlayerId, string>>(
-    () =>
-      mode === "jev"
-        ? { A: "Jev · A", B: "Jev · B" }
-        : { A: "Local · A", B: "Local · B" },
-    [mode],
-  );
+  const agentNames = useMemo<Record<PlayerId, string>>(() => {
+    const kind = mode === "jev" ? "Jev" : "Local";
+    return {
+      A: `${kind} · A · ${STRATEGY_PROFILES[profiles.A].label}`,
+      B: `${kind} · B · ${STRATEGY_PROFILES[profiles.B].label}`,
+    };
+  }, [mode, profiles]);
 
   const ensureOrchestrator = useCallback((): MatchOrchestrator => {
     if (!orchestratorRef.current) {
       orchestratorRef.current = new MatchOrchestrator(
-        buildAgents(modeRef.current),
+        buildAgents(modeRef.current, profilesRef.current),
         {
           config,
           matchId: `web-${Date.now()}`,
@@ -208,6 +232,20 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
     [reset],
   );
 
+  // Changing a profile starts a new match: mid-fight is not a fair moment to
+  // swap an agent's personality out from under it.
+  const setProfile = useCallback(
+    (id: PlayerId, profile: StrategyProfileId) => {
+      setProfiles((current) => {
+        const next = { ...current, [id]: profile };
+        profilesRef.current = next;
+        return next;
+      });
+      reset();
+    },
+    [reset],
+  );
+
   const scrub = useCallback(
     (index: number) => {
       // Scrubbing back detaches from live play; scrubbing to the end
@@ -265,7 +303,9 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
     error,
     speed,
     jevAvailable,
+    profiles,
     setMode,
+    setProfile,
     setSpeed,
     setViewIndex: scrub,
     start,

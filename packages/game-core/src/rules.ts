@@ -5,8 +5,10 @@
 
 import {
   manhattanDistance,
+  positionsEqual,
   type Action,
   type CombatConfig,
+  type EnvironmentState,
   type Position,
 } from "@jev-arena/types";
 
@@ -36,6 +38,63 @@ export function isWithinAttackRange(
   combat: CombatConfig,
 ): boolean {
   return manhattanDistance(attacker, defender) <= combat.attackRange;
+}
+
+/**
+ * Is there an unobstructed line between two tiles?
+ *
+ * A supercover walk: step along the line from `from` to `to` and treat the
+ * shot as blocked if any tile strictly between them is an obstacle. Endpoints
+ * are excluded, so standing next to a pillar never blocks your own shot.
+ *
+ * Deterministic and symmetric - `hasLineOfSight(a, b)` always equals
+ * `hasLineOfSight(b, a)` - which matters because both players' attacks are
+ * resolved from the same snapshot and neither may get a better angle than
+ * the other by accident.
+ */
+export function hasLineOfSight(
+  from: Position,
+  to: Position,
+  environment: EnvironmentState,
+): boolean {
+  if (positionsEqual(from, to)) return true;
+
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const steps = Math.max(Math.abs(dx), Math.abs(dy));
+
+  for (let step = 1; step < steps; step += 1) {
+    const t = step / steps;
+    // Round half away from zero on both axes so the walk is symmetric: the
+    // same pair of tiles picks the same intermediate tiles in either
+    // direction.
+    const x = Math.round(from.x + dx * t);
+    const y = Math.round(from.y + dy * t);
+    if (environment.obstacles.some((tile) => tile.x === x && tile.y === y)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Can this attack actually connect, accounting for cover? */
+export function canAttackConnect(
+  attacker: Position,
+  defender: Position,
+  combat: CombatConfig,
+  environment: EnvironmentState,
+): boolean {
+  if (!isWithinAttackRange(attacker, defender, combat)) return false;
+  if (!combat.requiresLineOfSight) return true;
+  return hasLineOfSight(attacker, defender, environment);
+}
+
+export function isOnEnergyNode(
+  position: Position,
+  environment: EnvironmentState,
+): boolean {
+  return environment.energyNodes.some((tile) => positionsEqual(tile, position));
 }
 
 /**

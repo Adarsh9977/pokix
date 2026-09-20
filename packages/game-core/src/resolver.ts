@@ -30,6 +30,8 @@ import { validateAction } from "./actions";
 import {
   clamp,
   energyCostOf,
+  hasLineOfSight,
+  isOnEnergyNode,
   isWithinAttackRange,
   mitigatedDamage,
   type Mitigation,
@@ -47,7 +49,9 @@ export type AttackOutcome =
   /** The defender dodged out of range. */
   | "EVADED"
   /** The defender walked out of range. */
-  | "MISSED";
+  | "MISSED"
+  /** Cover came between them before the shot landed. */
+  | "BLOCKED_BY_COVER";
 
 /**
  * What an invalid action collapses to.
@@ -70,6 +74,8 @@ export interface ResolvedPlayerTurn {
   /** A legal move that the opponent's body got in the way of. */
   readonly movementBlocked: boolean;
   readonly energySpent: number;
+  /** Energy picked up by ending the turn on a power node. */
+  readonly energyHarvested: number;
   readonly damageDealt: number;
   readonly damageTaken: number;
   readonly attackOutcome?: AttackOutcome;
@@ -181,6 +187,17 @@ export function resolveTurn(
       continue;
     }
 
+    // Range was checked against the snapshot the attacker saw, but cover is
+    // checked again here: either player may have stepped behind a pillar
+    // this turn, and a shot through rock should not land.
+    if (
+      config.combat.requiresLineOfSight &&
+      !hasLineOfSight(final[id], final[defenderId], state.environment)
+    ) {
+      attackOutcomes[id] = "BLOCKED_BY_COVER";
+      continue;
+    }
+
     const mitigation: Mitigation =
       defenderAction.type === "DEFEND"
         ? "DEFEND"
@@ -207,13 +224,24 @@ export function resolveTurn(
 
   // --- Phase 5: write the new state --------------------------------------
   const players = {} as Record<PlayerId, PlayerState>;
+  const energyHarvested = {} as Record<PlayerId, number>;
+
   for (const id of PLAYER_IDS) {
     const before = state.players[id];
+    // Harvested where they end up, not where they started, so a node can be
+    // taken and denied in the same turn.
+    energyHarvested[id] = isOnEnergyNode(final[id], state.environment)
+      ? config.combat.energyNodeRestore
+      : 0;
+
     players[id] = {
       id,
       hp: clamp(before.hp - damageTaken[id], 0, config.player.maxHp),
       energy: clamp(
-        before.energy - energySpent[id] + config.combat.energyRegenPerTurn,
+        before.energy -
+          energySpent[id] +
+          config.combat.energyRegenPerTurn +
+          energyHarvested[id],
         0,
         config.player.maxEnergy,
       ),
@@ -262,6 +290,7 @@ export function resolveTurn(
       moved: !positionsEqual(final[id], current[id]),
       movementBlocked: movementBlocked[id],
       energySpent: energySpent[id],
+      energyHarvested: energyHarvested[id],
       damageDealt: damageDealt[id],
       damageTaken: damageTaken[id],
       ...(rejection === undefined ? {} : { rejection }),

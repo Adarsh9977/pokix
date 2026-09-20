@@ -407,6 +407,128 @@ body::before {
   font-size: 12px;
 }
 
+/* ---- profile picker ----------------------------------------------------- */
+
+.profile-picker {
+  display: block;
+  margin: -4px 0 14px;
+}
+
+.profile-picker select {
+  width: 100%;
+  background: #0f151d;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.profile-picker select:hover {
+  border-color: #2b3a4b;
+}
+
+.profile-picker small {
+  display: block;
+  margin-top: 5px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.tag {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #546375;
+}
+
+.tag.on {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.4);
+}
+
+.tag.energy {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.4);
+}
+
+/* ---- key ---------------------------------------------------------------- */
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 20px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.swatch.threat-a {
+  background: rgba(56, 232, 255, 0.18);
+  border: 1px solid rgba(56, 232, 255, 0.45);
+}
+
+.swatch.threat-b {
+  background: rgba(255, 94, 168, 0.18);
+  border: 1px solid rgba(255, 94, 168, 0.45);
+}
+
+.swatch.node {
+  background: rgba(255, 209, 102, 0.3);
+  border: 1px solid #ffd166;
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+.swatch.cover {
+  background: #18222f;
+  border: 1px solid rgba(130, 175, 215, 0.45);
+}
+
+.swatch.sight-open {
+  height: 2px;
+  border-radius: 1px;
+  background: #9fe8b0;
+}
+
+.swatch.sight-blocked {
+  height: 2px;
+  border-radius: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    #ff8a8a 0 4px,
+    transparent 4px 7px
+  );
+}
+
 /* ---- controls ---------------------------------------------------------- */
 
 .controls {

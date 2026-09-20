@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +164,28 @@ describe("deployment configuration", () => {
     expect(Object.keys(webPackage.dependencies)).not.toContain(
       "@jev-arena/server",
     );
+  });
+});
+
+describe("working tree hygiene", () => {
+  it("contains no sync-conflict duplicate files", () => {
+    // This repo lives under ~/Documents, which iCloud syncs. When it races
+    // with a write it leaves a copy named `App 2.tsx` beside `App.tsx`.
+    // Those are picked up by tsconfig's include globs, so a stale duplicate
+    // fails the typecheck with an error pointing at a file nobody edited.
+    // Eight of them had already been committed before this test existed.
+    const tracked = execFileSync("git", ["ls-files"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).split("\n");
+
+    const duplicates = tracked.filter((path) =>
+      / \d+\.[A-Za-z0-9]+$/.test(path),
+    );
+    expect(
+      duplicates,
+      `sync-conflict copies are tracked: ${duplicates.join(", ")}`,
+    ).toEqual([]);
   });
 });
 

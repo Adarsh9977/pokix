@@ -61,6 +61,8 @@ export default function App() {
           state={state}
           record={shown}
           thinking={thinking}
+          profile={match.profiles.A}
+          onProfileChange={(profile) => match.setProfile("A", profile)}
         />
 
         <div className="arena-wrap">
@@ -92,6 +94,8 @@ export default function App() {
           state={state}
           record={shown}
           thinking={thinking}
+          profile={match.profiles.B}
+          onProfileChange={(profile) => match.setProfile("B", profile)}
         />
       </main>
 
@@ -177,6 +181,28 @@ export default function App() {
           )}
         </div>
       )}
+
+      <div className="key">
+        <span>
+          <i className="swatch threat-a" /> A&apos;s reach
+        </span>
+        <span>
+          <i className="swatch threat-b" /> B&apos;s reach
+        </span>
+        <span>
+          <i className="swatch node" /> power node (+
+          {config.combat.energyNodeRestore} energy)
+        </span>
+        <span>
+          <i className="swatch cover" /> cover blocks the shot
+        </span>
+        <span>
+          <i className="swatch sight-open" /> clear line
+        </span>
+        <span>
+          <i className="swatch sight-blocked" /> blocked line
+        </span>
+      </div>
 
       <footer className="legend">
         <span>

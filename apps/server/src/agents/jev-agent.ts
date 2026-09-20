@@ -12,20 +12,24 @@
  */
 
 import type { Agent } from "@jev-arena/agent-core";
-import type { AgentDecision, AgentObservation } from "@jev-arena/types";
+import {
+  STRATEGY_PROFILES,
+  type AgentDecision,
+  type AgentObservation,
+  type StrategyProfile,
+  type StrategyProfileId,
+} from "@jev-arena/types";
 import type { JevGateway } from "../typesafe/gateway";
 import {
   buildDecisionQuestions,
   buildDecisionState,
   parseDecision,
-  NEUTRAL_PROFILE,
-  type StrategyProfile,
 } from "./jev-decision";
 
 export interface JevAgentOptions {
   readonly name?: string;
   /** Changes the emphasis given to the model. Never changes the rules. */
-  readonly profile?: StrategyProfile;
+  readonly profile?: StrategyProfileId | StrategyProfile;
   /** Per-request timeout handed to the SDK. */
   readonly timeoutMs?: number;
 }
@@ -38,8 +42,11 @@ export class JevAgent implements Agent {
     private readonly gateway: JevGateway,
     private readonly options: JevAgentOptions = {},
   ) {
-    this.profile = options.profile ?? NEUTRAL_PROFILE;
-    this.name = options.name ?? `Jev (${this.profile.id})`;
+    this.profile =
+      typeof options.profile === "string"
+        ? STRATEGY_PROFILES[options.profile]
+        : (options.profile ?? STRATEGY_PROFILES.neutral);
+    this.name = options.name ?? `Jev (${this.profile.label})`;
   }
 
   async decide(observation: AgentObservation): Promise<AgentDecision> {

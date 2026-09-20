@@ -17,23 +17,33 @@
 // Relative imports only. This file is bundled into a single self-contained
 // function by scripts/build-vercel.ts, so nothing is left for the runtime to
 // resolve. See docs/ASSUMPTIONS.md A24.
-import { ArenaError, type AgentObservation } from "@jev-arena/types";
+import {
+  ArenaError,
+  isStrategyProfileId,
+  type AgentObservation,
+  type StrategyProfileId,
+} from "@jev-arena/types";
 import { JevAgent } from "../agents/jev-agent";
 import { hasApiKey, loadTypeSafeConfig } from "../config/env";
-import { createTypeSafeGateway } from "../typesafe/gateway";
+import { createTypeSafeGateway, type JevGateway } from "../typesafe/gateway";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 /** Reused across warm invocations so the SDK client is not rebuilt per call. */
-let cachedAgent: JevAgent | undefined;
+let cachedGateway: JevGateway | undefined;
+const cachedAgents = new Map<StrategyProfileId, JevAgent>();
 
-function agent(): JevAgent {
-  if (!cachedAgent) {
-    cachedAgent = new JevAgent(
-      createTypeSafeGateway(loadTypeSafeConfig(), { timeoutMs: 20_000 }),
-      { name: "Jev" },
-    );
+function agent(profile: StrategyProfileId): JevAgent {
+  if (!cachedGateway) {
+    cachedGateway = createTypeSafeGateway(loadTypeSafeConfig(), {
+      timeoutMs: 20_000,
+    });
   }
-  return cachedAgent;
+  let existing = cachedAgents.get(profile);
+  if (!existing) {
+    existing = new JevAgent(cachedGateway, { profile });
+    cachedAgents.set(profile, existing);
+  }
+  return existing;
 }
 
 /** Enough of a check to fail fast with a useful message. */
@@ -97,8 +107,14 @@ export default async function handler(
     return;
   }
 
+  // An unknown profile falls back to neutral rather than failing the turn:
+  // a bad preference is not worth losing a match over.
+  const profile: StrategyProfileId = isStrategyProfileId(body.profile)
+    ? body.profile
+    : "neutral";
+
   try {
-    const decision = await agent().decide(body.observation);
+    const decision = await agent(profile).decide(body.observation);
     // No caching: every turn is a fresh judgment about a new world.
     response.setHeader("cache-control", "no-store");
     response.status(200).json({ decision });

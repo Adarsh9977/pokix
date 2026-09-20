@@ -130,6 +130,38 @@ logged, printed, bundled, or sent to the browser. `.env` is git-ignored;
 way to check the turn limit. `--quiet` skips the per-turn output.
 `npm run match -- --mock --turns=5` is a short, free version of the match CLI.
 
+## How the fight works
+
+Four actions — **MOVE**, **ATTACK**, **DEFEND**, **DODGE** — on a 20×20 grid,
+resolved simultaneously. Three things make position matter:
+
+**Cover.** An obstacle between two agents blocks the shot. Being in range is
+not the same as having a shot, so "step out for an angle" is a real decision.
+The arena draws a solid line between the agents when the shot is available and
+a broken one when it is not.
+
+**Power nodes.** Four tiles restore a large chunk of energy to whoever ends a
+turn on them. Energy regenerates slower than attacking spends it, so a node is
+worth a detour — and worth denying.
+
+**Strategy profiles.** Aggressive, Defensive, Tactical or Neutral. A profile
+changes what an agent _wants_, never what it is allowed to do, so the fight
+stays fair. Pick one per agent in the UI.
+
+Profiles matter more than they sound. Two agents with identical instructions
+reach identical conclusions from identical state and mirror each other into an
+exact draw — a good proof that the engine is neutral, and a dull thing to
+watch. Give them different instructions and you get a fight:
+
+```text
+A (aggressive) → ATTACK    confidence 1.00
+B (defensive)  → DODGE     confidence 0.33
+```
+
+That confidence gap is the whole point of the project in one line. The
+aggressive agent is certain. The defensive one is genuinely torn, and says so
+with a number you can act on.
+
 ## Playing the game
 
 ```bash
@@ -145,7 +177,19 @@ Open <http://localhost:5173>.
 - **Replay** scrubs back through turns already played. It reads recorded
   decisions and never re-asks an agent, so scrubbing costs nothing.
 - The side panels show each agent's decision, the probability distribution it
-  chose from, its confidence, and the measured latency.
+  chose from, its confidence, the measured latency, and a profile selector.
+
+Reading the arena:
+
+| On screen            | Means                                                  |
+| -------------------- | ------------------------------------------------------ |
+| Tinted floor         | That agent's attack reach. Standing in it is dangerous |
+| Solid green line     | Clear shot between the agents                          |
+| Broken red line      | Cover is blocking the shot                             |
+| Amber diamonds       | Power nodes                                            |
+| Ring around an agent | Remaining HP                                           |
+| Arc facing the enemy | DEFEND, absorbing the hit                              |
+| Trail of ghosts      | MOVE or DODGE                                          |
 
 ### Playing with Jev agents
 
