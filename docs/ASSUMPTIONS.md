@@ -258,3 +258,74 @@ the line.
 
 Conflating them would either let malformed data reach the engine or would
 report an ordinary tactical mistake as a provider error.
+
+---
+
+## A17 — Everything sits behind one gateway interface
+
+**Spec:** Sections 11 and 33 require Jev to live behind an adapter.
+
+**Decision:** `apps/server/src/typesafe/gateway.ts` is the only file in the
+repository that imports `@typesafe-ai/sdk`. Everything above it depends on the
+`JevGateway` interface.
+
+The practical payoff is testing. Every test above that line runs against a
+fake gateway rather than mocked HTTP, which is why the default `npm test` run
+cannot spend a credit even by accident.
+
+---
+
+## A18 — Authentication is probed with `GET /v1/models`
+
+**Spec:** Section 17 wants authentication checked separately from the Jev
+request.
+
+**Decision:** The playground calls `client.models.list()` first. It proves the
+key works without spending input tokens, and it cleanly separates "your key is
+wrong" from "your key is fine but the request failed".
+
+---
+
+## A19 — What the playground will and will not say about credit
+
+**Spec:** Section 17 — "Do not fabricate a 'credits available' status if
+TypeSafe doesn't expose that information."
+
+**Decision:** TypeSafe publishes no balance endpoint, so the playground never
+reports one. It reports exactly three states, each backed by evidence:
+
+- **accepted** — a request went through and was metered. It quotes the actual
+  input-token count from `usage` and says outright that a remaining balance
+  cannot be reported.
+- **blocked** — the provider refused for a billing or quota reason, quoting
+  the provider's own message.
+- **unknown** — nothing reached the model, so nothing can be established.
+
+---
+
+## A20 — Status-code-driven error classification
+
+**Spec:** Section 46 requires a category for every external failure.
+
+**Decision:** Classification keys off the HTTP status rather than the SDK's
+error subclass, so the mapping lives in one readable table and stays correct
+if the SDK adds a subclass. Two refinements beyond the status code:
+
+- A `429` whose body talks about a quota or a balance is a `QUOTA_ERROR` or
+  `CREDIT_ERROR`, not a `RATE_LIMIT_ERROR`. Backing off does not refill an
+  allowance, so getting this wrong means retrying forever.
+- `400` and `422` map to `CONFIGURATION_ERROR` with a message saying plainly
+  that it is a bug on our side. The spec's category list has no
+  "invalid request" entry, and calling it an authentication or credit problem
+  would send a developer hunting in the wrong place.
+
+---
+
+## A21 — The playground checks concurrency by default
+
+**Spec:** Section 2 asks "Can we run two decisions concurrently?" among the
+questions the playground exists to answer.
+
+**Decision:** It does, by firing two requests at once. That is two extra small
+requests; `--minimal` skips them. A match depends on this working, so it is
+worth proving before the match is built.
