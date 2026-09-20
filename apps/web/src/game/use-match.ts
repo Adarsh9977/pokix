@@ -57,6 +57,11 @@ export interface UseMatch {
   readonly agentNames: Record<PlayerId, string>;
   readonly error: MatchError | undefined;
   readonly speed: number;
+  /**
+   * Whether the server has a TypeSafe key. `undefined` while unknown.
+   * Lets the UI say so before you press Start, rather than after.
+   */
+  readonly jevAvailable: boolean | undefined;
   setMode(mode: AgentMode): void;
   setSpeed(speed: number): void;
   setViewIndex(index: number): void;
@@ -73,6 +78,7 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
   const [viewIndex, setViewIndex] = useState(-1);
   const [error, setError] = useState<MatchError | undefined>();
   const [speed, setSpeed] = useState(1);
+  const [jevAvailable, setJevAvailable] = useState<boolean | undefined>();
 
   const orchestratorRef = useRef<MatchOrchestrator | null>(null);
   const runningRef = useRef(false);
@@ -212,6 +218,38 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
     [turns.length],
   );
 
+  // Ask the server what this deployment can do. AGENT_MODE decides the
+  // starting mode, but only if a key is actually present: starting in a mode
+  // that cannot work would be worse than ignoring the setting.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/config");
+        if (!response.ok) throw new Error(String(response.status));
+        const body = (await response.json()) as {
+          agentMode?: string;
+          jevConfigured?: boolean;
+        };
+        if (cancelled) return;
+        setJevAvailable(Boolean(body.jevConfigured));
+        if (body.agentMode === "jev" && body.jevConfigured) {
+          setModeState("jev");
+          modeRef.current = "jev";
+        }
+      } catch {
+        // No endpoint at all: a plain `vite build` preview, or `npm run dev`
+        // with nothing serving /api. Local agents still work perfectly.
+        if (!cancelled) setJevAvailable(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => () => void (runningRef.current = false), []);
 
   const viewing = viewIndex >= 0 ? turns[viewIndex] : undefined;
@@ -226,6 +264,7 @@ export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
     agentNames,
     error,
     speed,
+    jevAvailable,
     setMode,
     setSpeed,
     setViewIndex: scrub,
