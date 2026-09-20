@@ -46,20 +46,47 @@ function agent(profile: StrategyProfileId): JevAgent {
   return existing;
 }
 
-/** Enough of a check to fail fast with a useful message. */
-function isObservation(value: unknown): value is AgentObservation {
-  if (value === null || typeof value !== "object") return false;
+/**
+ * Validates every field the decision builder will read.
+ *
+ * Deliberately exhaustive rather than "enough to look right". A partial
+ * observation used to sail past a looser guard and then throw deep inside
+ * the agent, which surfaced as an opaque 502 instead of a 400 naming the
+ * problem. Anything this function misses becomes a crash, so it checks the
+ * whole contract.
+ */
+function missingObservationFields(value: unknown): string[] {
+  if (value === null || typeof value !== "object") return ["observation"];
   const o = value as Partial<AgentObservation>;
-  return (
-    typeof o.turn === "number" &&
-    typeof o.stateVersion === "number" &&
-    Array.isArray(o.availableActions) &&
-    o.availableActions.length > 0 &&
-    typeof o.self === "object" &&
-    typeof o.enemy === "object" &&
-    Array.isArray(o.legalMoveDirections) &&
-    Array.isArray(o.legalDodgeDirections)
+  const missing: string[] = [];
+
+  const need = (ok: boolean, field: string) => {
+    if (!ok) missing.push(field);
+  };
+
+  need(typeof o.turn === "number", "turn");
+  need(typeof o.stateVersion === "number", "stateVersion");
+  need(typeof o.self === "object" && o.self !== null, "self");
+  need(typeof o.enemy === "object" && o.enemy !== null, "enemy");
+  need(
+    Array.isArray(o.availableActions) && o.availableActions.length > 0,
+    "availableActions",
   );
+  need(Array.isArray(o.legalMoveDirections), "legalMoveDirections");
+  need(Array.isArray(o.legalDodgeDirections), "legalDodgeDirections");
+  need(typeof o.distanceToEnemy === "number", "distanceToEnemy");
+  need(typeof o.attackRange === "number", "attackRange");
+  need(typeof o.enemyInAttackRange === "boolean", "enemyInAttackRange");
+  need(typeof o.hasLineOfSightToEnemy === "boolean", "hasLineOfSightToEnemy");
+  need(typeof o.isBehindCover === "boolean", "isBehindCover");
+  need(typeof o.standingOnEnergyNode === "boolean", "standingOnEnergyNode");
+  need(Array.isArray(o.energyNodes), "energyNodes");
+  need(
+    typeof o.environment === "object" && o.environment !== null,
+    "environment",
+  );
+
+  return missing;
 }
 
 function fail(
@@ -97,15 +124,17 @@ export default async function handler(
       ? (JSON.parse(request.body) as Record<string, unknown>)
       : ((request.body ?? {}) as Record<string, unknown>);
 
-  if (!isObservation(body.observation)) {
+  const missing = missingObservationFields(body.observation);
+  if (missing.length > 0) {
     fail(
       response,
       400,
       "INVALID_RESPONSE",
-      "The request body must contain a valid `observation`.",
+      `The request body needs a complete \`observation\`. Missing or malformed: ${missing.join(", ")}.`,
     );
     return;
   }
+  const observation = body.observation as AgentObservation;
 
   // An unknown profile falls back to neutral rather than failing the turn:
   // a bad preference is not worth losing a match over.
@@ -114,7 +143,7 @@ export default async function handler(
     : "neutral";
 
   try {
-    const decision = await agent(profile).decide(body.observation);
+    const decision = await agent(profile).decide(observation);
     // No caching: every turn is a fresh judgment about a new world.
     response.setHeader("cache-control", "no-store");
     response.status(200).json({ decision });

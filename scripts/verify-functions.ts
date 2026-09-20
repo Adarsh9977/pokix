@@ -18,6 +18,8 @@
  * Pass `--offline` to skip it.
  */
 
+import { DEFAULT_GAME_CONFIG } from "@jev-arena/types";
+import { buildObservation, createInitialState } from "@jev-arena/game-core";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -50,19 +52,19 @@ function makeResponse(): { res: unknown; captured: Captured } {
   return { res, captured };
 }
 
-const OBSERVATION = {
-  turn: 1,
-  stateVersion: 0,
-  self: { id: "A", hp: 100, energy: 100, position: { x: 5, y: 5 } },
-  enemy: { id: "B", hp: 100, position: { x: 7, y: 5 } },
-  availableActions: ["MOVE", "ATTACK", "DEFEND", "DODGE"],
-  legalMoveDirections: ["NORTH", "SOUTH", "EAST", "WEST"],
-  legalDodgeDirections: ["NORTH", "SOUTH", "EAST", "WEST"],
-  distanceToEnemy: 2,
-  attackRange: 2,
-  enemyInAttackRange: true,
-  environment: { width: 20, height: 20, obstacles: [] },
-};
+/**
+ * Built by the real observation builder rather than hand-written.
+ *
+ * A hand-written fixture drifts: this one was missing `energyNodes` after a
+ * field was added, which made the endpoint throw where it should have
+ * returned a clean 400. Deriving it from the engine means the verification
+ * always sends what a real client sends.
+ */
+const OBSERVATION = buildObservation(
+  createInitialState(DEFAULT_GAME_CONFIG),
+  "A",
+  DEFAULT_GAME_CONFIG,
+);
 
 let failures = 0;
 
@@ -146,6 +148,22 @@ async function main(): Promise<void> {
       "/api/decide rejects a malformed body with 400",
       captured.status === 400,
       `HTTP ${captured.status} ${body?.error?.category}`,
+    );
+  }
+
+  // --- /api/decide, an observation missing a field -------------------------
+  {
+    // A stale client, or one built against an older shape. It must get a 400
+    // naming the problem, never a crash deep inside the agent.
+    const { energyNodes: _dropped, ...partial } = OBSERVATION;
+    const { res, captured } = makeResponse();
+    await decide({ method: "POST", body: { observation: partial } }, res);
+    const body = captured.body as { error?: { message?: string } };
+    check(
+      "/api/decide names the missing field instead of throwing",
+      captured.status === 400 &&
+        (body?.error?.message ?? "").includes("energyNodes"),
+      `HTTP ${captured.status} ${body?.error?.message}`,
     );
   }
 
