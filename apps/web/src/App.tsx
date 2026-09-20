@@ -1,7 +1,7 @@
 import { DEFAULT_GAME_CONFIG, PLAYER_IDS } from "@jev-arena/types";
 import { useMemo } from "react";
 import { AgentPanel } from "./components/AgentPanel";
-import { Arena } from "./components/Arena";
+import { Arena3D } from "./components/Arena3D";
 import { initialSnapshot, useMatch } from "./game/use-match";
 
 const config = DEFAULT_GAME_CONFIG;
@@ -66,7 +66,7 @@ export default function App() {
         />
 
         <div className="arena-wrap">
-          <Arena
+          <Arena3D
             config={config}
             record={shown}
             fallbackState={blank}
@@ -195,6 +195,9 @@ export default function App() {
         </span>
         <span>
           <i className="swatch cover" /> cover blocks the shot
+        </span>
+        <span>
+          <i className="swatch charge" /> charge pips (bigger hit)
         </span>
         <span>
           <i className="swatch sight-open" /> clear line

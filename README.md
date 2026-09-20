@@ -144,6 +144,12 @@ a broken one when it is not.
 turn on them. Energy regenerates slower than attacking spends it, so a node is
 worth a detour — and worth denying.
 
+**Overcharge.** Every turn you _don't_ attack, you store a point of charge —
+up to three — and your next hit lands far harder (16 damage becomes 34). Your
+robot visibly puffs up and its antenna lights, and **your opponent can see
+it**. A wound-up enemy is a telegraphed threat, which turns DEFEND and DODGE
+into reads rather than guesses.
+
 **Strategy profiles.** Aggressive, Defensive, Tactical or Neutral. A profile
 changes what an agent _wants_, never what it is allowed to do, so the fight
 stays fair. Pick one per agent in the UI.

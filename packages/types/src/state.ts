@@ -32,6 +32,15 @@ export interface PlayerState {
   readonly hp: number;
   readonly energy: number;
   readonly position: Position;
+  /**
+   * Stored attack power, 0..maxCharge.
+   *
+   * Builds on any turn the player does not attack and empties the moment
+   * they do. It gives the fight a rhythm: a held charge is a visible threat,
+   * and because the opponent can see it, "they are winding up" becomes a
+   * decision rather than a surprise.
+   */
+  readonly charge: number;
   /** Ability name -> turns remaining. Empty today; the hook exists for later. */
   readonly cooldowns: Readonly<Record<string, number>>;
 }

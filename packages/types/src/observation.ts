@@ -19,12 +19,19 @@ export interface ObservedSelf {
   readonly hp: number;
   readonly energy: number;
   readonly position: Position;
+  readonly charge: number;
 }
 
 export interface ObservedEnemy {
   readonly id: PlayerId;
   readonly hp: number;
   readonly position: Position;
+  /**
+   * Visible on purpose. A charged opponent is a telegraphed threat, and
+   * being able to read it is what turns DEFEND and DODGE into decisions
+   * rather than guesses.
+   */
+  readonly charge: number;
 }
 
 export interface ObservedEnvironment {
@@ -73,6 +80,12 @@ export interface AgentObservation {
    * "move to close distance".
    */
   readonly isBehindCover: boolean;
+
+  readonly maxCharge: number;
+  /** Extra damage each point of charge adds to a hit. */
+  readonly chargeDamageBonus: number;
+  /** Damage the enemy's next attack would do if it lands unmitigated. */
+  readonly enemyPotentialDamage: number;
 
   readonly standingOnEnergyNode: boolean;
   /** Power nodes, nearest first. */

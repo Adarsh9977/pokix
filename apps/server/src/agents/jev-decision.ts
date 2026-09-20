@@ -47,11 +47,11 @@ export const QUESTION_IDS = {
  * documentation asks for.
  */
 const ACTION_DESCRIPTIONS: Record<ActionType, string> = {
-  MOVE: "Reposition one tile. Costs no energy. Use it to close distance on the enemy, to break away from them, or to get around an obstacle.",
+  MOVE: "Reposition one tile. Costs no energy and builds one more point of charge. Use it to close distance, to break away, to reach a power node, or to get an angle around an obstacle.",
   ATTACK:
-    "Strike the enemy for solid damage. Costs energy. Only offered when the enemy is already within reach this turn.",
+    "Strike the enemy for solid damage, spending all of your stored charge to hit harder. Costs energy. Only offered when the enemy is already within reach with a clear line.",
   DEFEND:
-    "Brace. Costs nothing, deals nothing, and halves any damage taken this turn. The safe option when energy is low or an attack is expected.",
+    "Brace. Costs nothing, deals nothing, halves any damage taken this turn, and builds one more point of charge. The safe answer to an enemy who is visibly winding up.",
   DODGE:
     "Spend energy to evade one tile. If the move breaks the enemy's reach the incoming attack misses completely; if not, it only grazes.",
 };
@@ -84,11 +84,21 @@ export function buildDecisionState(
       hp: observation.self.hp,
       energy: observation.self.energy,
       position: observation.self.position,
+      storedCharge: observation.self.charge,
+      maxCharge: observation.maxCharge,
     },
     enemy: {
       id: observation.enemy.id,
       hp: observation.enemy.hp,
       position: observation.enemy.position,
+      storedCharge: observation.enemy.charge,
+      damageTheirNextHitWouldDo: observation.enemyPotentialDamage,
+    },
+    charging: {
+      howItWorks:
+        "Charge builds by one on any turn you do not attack, and empties the moment you do. A stored charge makes your next attack hit much harder.",
+      yourChargeIsFull: observation.self.charge >= observation.maxCharge,
+      enemyChargeIsFull: observation.enemy.charge >= observation.maxCharge,
     },
     tactical: {
       distanceToEnemy: observation.distanceToEnemy,

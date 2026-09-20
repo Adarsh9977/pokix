@@ -87,11 +87,13 @@ export function buildObservation(
       hp: self.hp,
       energy: self.energy,
       position: { ...self.position },
+      charge: self.charge,
     },
     enemy: {
       id: enemy.id,
       hp: enemy.hp,
       position: { ...enemy.position },
+      charge: enemy.charge,
     },
     availableActions,
     legalMoveDirections,
@@ -100,6 +102,11 @@ export function buildObservation(
     attackRange: config.combat.attackRange,
     enemyInAttackRange: distanceToEnemy <= config.combat.attackRange,
     hasLineOfSightToEnemy: lineOfSight,
+    maxCharge: config.combat.maxCharge,
+    chargeDamageBonus: config.combat.chargeDamageBonus,
+    enemyPotentialDamage:
+      config.combat.attackDamage +
+      enemy.charge * config.combat.chargeDamageBonus,
     /** True when the enemy is close enough but cover is in the way. */
     isBehindCover: distanceToEnemy <= config.combat.attackRange && !lineOfSight,
     standingOnEnergyNode: isOnEnergyNode(self.position, state.environment),
