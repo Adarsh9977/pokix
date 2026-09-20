@@ -3,16 +3,7 @@
   "framework": null,
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": "apps/web/dist",
-  "cleanUrls": true,
-  "trailingSlash": false,
   "github": {
     "silent": true
-  },
-  "functions": {
-    "api/decide.ts": {
-      "memory": 512,
-      "maxDuration": 30
-    }
   }
 }
