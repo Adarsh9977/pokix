@@ -1,0 +1,242 @@
+/**
+ * Drives a match from React, one turn at a time.
+ *
+ * The important separation: the simulation is never driven by the renderer.
+ * The orchestrator resolves a turn as fast as the agents allow; the UI then
+ * spends a fixed amount of wall-clock time animating it. Rendering speed
+ * cannot change the outcome, and a slow agent cannot drop a frame.
+ */
+
+import {
+  DEFAULT_GAME_CONFIG,
+  type GameConfig,
+  type PlayerId,
+} from "@jev-arena/types";
+import {
+  HeuristicAgent,
+  MatchOrchestrator,
+  type Agent,
+  type AgentTurnRecord,
+} from "@jev-arena/agent-core";
+import { createInitialState } from "@jev-arena/game-core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RemoteJevAgent } from "./remote-jev-agent";
+
+export type AgentMode = "local" | "jev";
+export type MatchPhase =
+  "idle" | "thinking" | "animating" | "paused" | "finished";
+
+export interface MatchError {
+  readonly category: string;
+  readonly message: string;
+}
+
+const TURN_ANIMATION_MS = 520;
+
+function buildAgents(mode: AgentMode): Record<PlayerId, Agent> {
+  if (mode === "jev") {
+    return {
+      A: new RemoteJevAgent({ name: "Jev · A", profile: "neutral" }),
+      B: new RemoteJevAgent({ name: "Jev · B", profile: "neutral" }),
+    };
+  }
+  return {
+    A: new HeuristicAgent({ name: "Local · A" }),
+    B: new HeuristicAgent({ name: "Local · B" }),
+  };
+}
+
+export interface UseMatch {
+  readonly config: GameConfig;
+  readonly mode: AgentMode;
+  readonly phase: MatchPhase;
+  readonly turns: readonly AgentTurnRecord[];
+  /** The turn currently on screen. Lets the timeline scrub the past. */
+  readonly viewIndex: number;
+  readonly viewing: AgentTurnRecord | undefined;
+  readonly agentNames: Record<PlayerId, string>;
+  readonly error: MatchError | undefined;
+  readonly speed: number;
+  setMode(mode: AgentMode): void;
+  setSpeed(speed: number): void;
+  setViewIndex(index: number): void;
+  start(): void;
+  pause(): void;
+  step(): void;
+  reset(): void;
+}
+
+export function useMatch(config: GameConfig = DEFAULT_GAME_CONFIG): UseMatch {
+  const [mode, setModeState] = useState<AgentMode>("local");
+  const [phase, setPhase] = useState<MatchPhase>("idle");
+  const [turns, setTurns] = useState<AgentTurnRecord[]>([]);
+  const [viewIndex, setViewIndex] = useState(-1);
+  const [error, setError] = useState<MatchError | undefined>();
+  const [speed, setSpeed] = useState(1);
+
+  const orchestratorRef = useRef<MatchOrchestrator | null>(null);
+  const runningRef = useRef(false);
+  const modeRef = useRef(mode);
+  const speedRef = useRef(speed);
+  const followRef = useRef(true);
+
+  modeRef.current = mode;
+  speedRef.current = speed;
+
+  const agentNames = useMemo<Record<PlayerId, string>>(
+    () =>
+      mode === "jev"
+        ? { A: "Jev · A", B: "Jev · B" }
+        : { A: "Local · A", B: "Local · B" },
+    [mode],
+  );
+
+  const ensureOrchestrator = useCallback((): MatchOrchestrator => {
+    if (!orchestratorRef.current) {
+      orchestratorRef.current = new MatchOrchestrator(
+        buildAgents(modeRef.current),
+        {
+          config,
+          matchId: `web-${Date.now()}`,
+          // Generous: a cold serverless function plus a model call can be
+          // slow, and a false timeout would look like the agent gave up.
+          decisionTimeoutMs: 30_000,
+        },
+      );
+    }
+    return orchestratorRef.current;
+  }, [config]);
+
+  const playOneTurn = useCallback(async (): Promise<boolean> => {
+    const orchestrator = ensureOrchestrator();
+    if (orchestrator.state.status !== "running") {
+      setPhase("finished");
+      return false;
+    }
+
+    setPhase("thinking");
+    try {
+      const record = await orchestrator.playTurn();
+      setTurns((previous) => {
+        const next = [...previous, record];
+        if (followRef.current) setViewIndex(next.length - 1);
+        return next;
+      });
+
+      // Surface a decision failure without stopping the match: the engine
+      // already substituted a fallback, so the game is still valid.
+      const failing = (["A", "B"] as const)
+        .map((id) => record.traces[id])
+        .find((trace) => trace.errorCategory !== undefined);
+      setError(
+        failing
+          ? {
+              category: failing.errorCategory ?? "PROVIDER_ERROR",
+              message: failing.error ?? "A decision failed.",
+            }
+          : undefined,
+      );
+
+      setPhase("animating");
+      await new Promise((resolve) =>
+        setTimeout(resolve, TURN_ANIMATION_MS / speedRef.current),
+      );
+
+      if (orchestrator.state.status !== "running") {
+        setPhase("finished");
+        return false;
+      }
+      return true;
+    } catch (caught) {
+      setError({
+        category: "INTERNAL_GAME_ERROR",
+        message: caught instanceof Error ? caught.message : String(caught),
+      });
+      setPhase("paused");
+      return false;
+    }
+  }, [ensureOrchestrator]);
+
+  const loop = useCallback(async () => {
+    while (runningRef.current) {
+      const shouldContinue = await playOneTurn();
+      if (!shouldContinue) break;
+    }
+    runningRef.current = false;
+    setPhase((current) => (current === "finished" ? current : "paused"));
+  }, [playOneTurn]);
+
+  const start = useCallback(() => {
+    if (runningRef.current) return;
+    followRef.current = true;
+    runningRef.current = true;
+    void loop();
+  }, [loop]);
+
+  const pause = useCallback(() => {
+    runningRef.current = false;
+  }, []);
+
+  const step = useCallback(() => {
+    if (runningRef.current) return;
+    followRef.current = true;
+    void playOneTurn();
+  }, [playOneTurn]);
+
+  const reset = useCallback(() => {
+    runningRef.current = false;
+    orchestratorRef.current = null;
+    followRef.current = true;
+    setTurns([]);
+    setViewIndex(-1);
+    setError(undefined);
+    setPhase("idle");
+  }, []);
+
+  const setMode = useCallback(
+    (next: AgentMode) => {
+      setModeState(next);
+      modeRef.current = next;
+      reset();
+    },
+    [reset],
+  );
+
+  const scrub = useCallback(
+    (index: number) => {
+      // Scrubbing back detaches from live play; scrubbing to the end
+      // re-attaches.
+      followRef.current = index >= turns.length - 1;
+      setViewIndex(index);
+    },
+    [turns.length],
+  );
+
+  useEffect(() => () => void (runningRef.current = false), []);
+
+  const viewing = viewIndex >= 0 ? turns[viewIndex] : undefined;
+
+  return {
+    config,
+    mode,
+    phase,
+    turns,
+    viewIndex,
+    viewing,
+    agentNames,
+    error,
+    speed,
+    setMode,
+    setSpeed,
+    setViewIndex: scrub,
+    start,
+    pause,
+    step,
+    reset,
+  };
+}
+
+/** The state to draw when no turn has been played yet. */
+export function initialSnapshot(config: GameConfig) {
+  return createInitialState(config);
+}
