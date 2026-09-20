@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -29,6 +29,39 @@ describe("workspace configuration", () => {
   it("pins a Node version that the TypeSafe JavaScript SDK supports", () => {
     // The TypeSafe JS SDK documents Node.js 20 or newer.
     expect(rootPackageJson.engines.node).toBe(">=20.19.0");
+  });
+});
+
+describe("deployment configuration", () => {
+  const vercel = JSON.parse(read("vercel.json")) as {
+    buildCommand: string;
+    outputDirectory: string;
+  };
+
+  it("builds with a script that actually exists", () => {
+    const script = vercel.buildCommand.replace(/^npm run /, "");
+    expect(rootPackageJson.scripts).toHaveProperty(script);
+  });
+
+  it("points at an output directory that is really there", () => {
+    // The exact failure this guards against: Vercel ran the build, the build
+    // emitted nothing, and the deploy died looking for a directory that did
+    // not exist. A unit test is a cheaper place to find that out.
+    const output = join(repoRoot, vercel.outputDirectory);
+    expect(existsSync(output)).toBe(true);
+    expect(statSync(output).isDirectory()).toBe(true);
+  });
+
+  it("serves an index page from the output directory", () => {
+    expect(
+      existsSync(join(repoRoot, vercel.outputDirectory, "index.html")),
+    ).toBe(true);
+  });
+
+  it("keeps the placeholder honest about there being no game yet", () => {
+    const page = read("public/index.html").toLowerCase();
+    expect(page).toContain("placeholder");
+    expect(page).not.toContain("play now");
   });
 });
 

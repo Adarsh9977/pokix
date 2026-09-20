@@ -91,6 +91,7 @@ jev-arena/
 ├── packages/      # reusable libraries (types, game-core, agent-core)
 ├── scripts/       # developer CLIs
 ├── tests/         # repository-level guard tests
+├── public/        # placeholder status page (replaced by the real app later)
 ├── .env.example   # required environment variables
 └── spec.md        # the product specification this repo implements
 ```
@@ -160,6 +161,18 @@ The live tests are the only ones that spend credits, and they self-skip when
 the switch is unset. Everything above the SDK boundary is tested against a
 fake gateway rather than mocked HTTP, so the default run cannot spend a credit
 even by accident.
+
+## Deployment
+
+There is no playable build yet. The spec builds the simulation first and the
+frontend last, so `public/index.html` is a static status page and nothing
+more. `vercel.json` keeps `npm run build` as the build command, so a broken
+typecheck still fails the deploy.
+
+When `apps/web` lands, `outputDirectory` becomes `apps/web/dist` and the
+placeholder is deleted. See `docs/ASSUMPTIONS.md` A22 — this is a recorded
+deviation from the spec's "no deployment infrastructure" rule, added because
+a Vercel project was already connected to the repo.
 
 ## License
 
