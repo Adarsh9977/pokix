@@ -25,6 +25,7 @@ import {
   JevAgent,
   createTypeSafeGateway,
   hasApiKey,
+  loadAgentMode,
   loadDotEnv,
   loadTypeSafeConfig,
 } from "@jev-arena/server";
@@ -81,7 +82,13 @@ function printTurn(record: AgentTurnRecord, config: GameConfig): void {
 async function main(): Promise<void> {
   loadDotEnv();
 
-  const useMock = process.argv.includes("--mock");
+  // AGENT_MODE is the default; an explicit flag overrides it for one run.
+  const mode = process.argv.includes("--mock")
+    ? "mock"
+    : process.argv.includes("--jev")
+      ? "jev"
+      : loadAgentMode();
+  const useMock = mode === "mock";
   const maxTurns = Number.parseInt(flag("turns") ?? "", 10);
   const timeoutMs = Number.parseInt(flag("timeout") ?? "", 10);
 
@@ -97,7 +104,7 @@ async function main(): Promise<void> {
   } else {
     if (!hasApiKey()) {
       console.error(
-        "\nTYPESAFE_API_KEY is not set, so a real match cannot run.\n" +
+        "\nAGENT_MODE=jev, but TYPESAFE_API_KEY is not set, so a real match cannot run.\n" +
           "  cp .env.example .env   and paste your key, then try again.\n" +
           "  Or run a free local match:  npm run match -- --mock\n",
       );
@@ -116,6 +123,7 @@ async function main(): Promise<void> {
   console.log("                     JEV ARENA");
   console.log("═".repeat(58));
   console.log(`  ${agents.A.name}   vs   ${agents.B.name}`);
+  console.log(`  Agent mode  ${mode}`);
   console.log(
     `  Arena ${config.arena.width}x${config.arena.height}   turn limit ${config.maxTurns}`,
   );

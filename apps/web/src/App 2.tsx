@@ -43,13 +43,7 @@ export default function App() {
           onClick={() => match.setMode("jev")}
         >
           Jev agents
-          <small>
-            {match.jevAvailable === undefined
-              ? "real model · checking server…"
-              : match.jevAvailable
-                ? "real model · server key detected"
-                : "real model · no server key configured"}
-          </small>
+          <small>real model · needs a server key</small>
         </button>
       </div>
 
@@ -150,20 +144,6 @@ export default function App() {
         )}
       </div>
 
-      {match.mode === "jev" && match.jevAvailable === false && (
-        <div className="banner">
-          <strong>NO SERVER KEY</strong>
-          <span>
-            This deployment has no TYPESAFE_API_KEY, so Jev agents cannot
-            decide. Every turn will fall back to DEFEND.
-          </span>
-          <em>
-            Set TYPESAFE_API_KEY in your Vercel project settings and redeploy,
-            or switch to Local agents — they play the full game for free.
-          </em>
-        </div>
-      )}
-
       {match.error && (
         <div className="banner">
           <strong>{match.error.category}</strong>
@@ -171,8 +151,8 @@ export default function App() {
           {match.mode === "jev" && (
             <em>
               The match keeps running — the engine substitutes DEFEND when an
-              agent cannot answer. Switch to Local agents to play without an API
-              key.
+              agent cannot answer. Switch to Local agents to play without an
+              API key.
             </em>
           )}
         </div>
