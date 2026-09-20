@@ -60,6 +60,14 @@ export interface ArenaErrorOptions {
   readonly providerMessage?: string;
   /** HTTP status, when the failure came from an HTTP call. */
   readonly status?: number;
+  /**
+   * Overrides the category default.
+   *
+   * Needed because retryability is not purely a function of category: a 529
+   * Overloaded is a provider error the docs say to retry with backoff, while
+   * most provider errors are not worth retrying.
+   */
+  readonly retryable?: boolean;
 }
 
 export class ArenaError extends Error {
@@ -67,6 +75,7 @@ export class ArenaError extends Error {
   readonly providerRequestId?: string;
   readonly providerMessage?: string;
   readonly status?: number;
+  private readonly retryableOverride?: boolean;
 
   constructor(
     category: ErrorCategory,
@@ -86,10 +95,13 @@ export class ArenaError extends Error {
       this.providerMessage = options.providerMessage;
     }
     if (options.status !== undefined) this.status = options.status;
+    if (options.retryable !== undefined) {
+      this.retryableOverride = options.retryable;
+    }
   }
 
   get retryable(): boolean {
-    return isRetryableCategory(this.category);
+    return this.retryableOverride ?? isRetryableCategory(this.category);
   }
 }
 

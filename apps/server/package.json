@@ -1,0 +1,17 @@
+{
+  "name": "@jev-arena/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side Jev Arena: the TypeSafe integration, the Jev playground, and the match API. The only place an API key ever exists.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@jev-arena/agent-core": "*",
+    "@jev-arena/game-core": "*",
+    "@jev-arena/types": "*",
+    "@typesafe-ai/sdk": "^0.6.0"
+  }
+}
