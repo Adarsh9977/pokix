@@ -136,7 +136,7 @@ body::before {
 
 .arena-wrap {
   position: relative;
-  aspect-ratio: 1;
+  aspect-ratio: 1.15;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -146,10 +146,17 @@ body::before {
     0 24px 70px rgba(0, 0, 0, 0.6);
 }
 
-.arena-canvas {
+.arena-canvas,
+.arena-wrap canvas {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.arena-wrap canvas:active {
+  cursor: grabbing;
 }
 
 .arena-status {
@@ -506,6 +513,11 @@ body::before {
   border: 1px solid #ffd166;
   transform: rotate(45deg);
   border-radius: 2px;
+}
+
+.swatch.charge {
+  background: radial-gradient(circle, #ffd166 40%, transparent 42%);
+  border: none;
 }
 
 .swatch.cover {

@@ -34,6 +34,7 @@ export function createInitialState(config: GameConfig): GameState {
       hp: config.player.startingHp,
       energy: config.player.startingEnergy,
       position: { ...config.startingPositions[id] },
+      charge: 0,
       cooldowns: {},
     };
   }

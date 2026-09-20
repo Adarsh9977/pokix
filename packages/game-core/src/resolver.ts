@@ -34,6 +34,7 @@ import {
   isOnEnergyNode,
   isWithinAttackRange,
   mitigatedDamage,
+  nextCharge,
   type Mitigation,
 } from "./rules";
 import { deepFreeze } from "./state";
@@ -78,6 +79,8 @@ export interface ResolvedPlayerTurn {
   readonly energyHarvested: number;
   readonly damageDealt: number;
   readonly damageTaken: number;
+  /** Charge spent on this attack. Zero unless they actually swung. */
+  readonly chargeSpent: number;
   readonly attackOutcome?: AttackOutcome;
 }
 
@@ -205,10 +208,10 @@ export function resolveTurn(
           ? "DODGE_GRAZE"
           : "NONE";
 
-    // Report the damage that was actually absorbed, so a killing blow is not
-    // inflated by overkill in the analytics.
+    // Charge is read from the snapshot: the power an attacker had banked
+    // when the decision was made, not after this turn's accrual.
     const absorbed = Math.min(
-      mitigatedDamage(mitigation, config.combat),
+      mitigatedDamage(mitigation, config.combat, state.players[id].charge),
       state.players[defenderId].hp,
     );
 
@@ -236,6 +239,11 @@ export function resolveTurn(
 
     players[id] = {
       id,
+      charge: nextCharge(
+        before.charge,
+        applied[id].type === "ATTACK",
+        config.combat,
+      ),
       hp: clamp(before.hp - damageTaken[id], 0, config.player.maxHp),
       energy: clamp(
         before.energy -
@@ -291,6 +299,7 @@ export function resolveTurn(
       movementBlocked: movementBlocked[id],
       energySpent: energySpent[id],
       energyHarvested: energyHarvested[id],
+      chargeSpent: applied[id].type === "ATTACK" ? state.players[id].charge : 0,
       damageDealt: damageDealt[id],
       damageTaken: damageTaken[id],
       ...(rejection === undefined ? {} : { rejection }),

@@ -32,5 +32,16 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    // Three.js is most of the bundle and changes far less often than the
+    // game does, so it gets its own long-lived chunk instead of forcing a
+    // full re-download on every gameplay tweak.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ["three", "@react-three/fiber", "@react-three/drei"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1200,
   },
 });

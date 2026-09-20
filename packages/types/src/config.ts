@@ -48,6 +48,12 @@ export interface CombatConfig {
   readonly energyRegenPerTurn: number;
   /** Energy restored by ending a turn on a power node. */
   readonly energyNodeRestore: number;
+  /** Maximum stored attack power. */
+  readonly maxCharge: number;
+  /** Charge gained on any turn the player does not attack. */
+  readonly chargeGainPerTurn: number;
+  /** Extra damage per point of charge spent. */
+  readonly chargeDamageBonus: number;
   /**
    * Whether an obstacle between two players blocks an attack.
    *
@@ -153,6 +159,12 @@ export const DEFAULT_GAME_CONFIG: GameConfig = deepFreeze({
     // which is what makes a power node worth the detour.
     energyRegenPerTurn: 7,
     energyNodeRestore: 25,
+    // Three turns of patience roughly doubles a hit: 16 becomes 34. Enough
+    // to be worth waiting for, and enough that ignoring a fully charged
+    // opponent is a mistake you can see coming.
+    maxCharge: 3,
+    chargeGainPerTurn: 1,
+    chargeDamageBonus: 6,
     requiresLineOfSight: true,
     defendDamageReduction: 0.5,
     grazedDodgeDamageReduction: 0.25,

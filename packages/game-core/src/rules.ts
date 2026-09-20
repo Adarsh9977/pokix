@@ -104,6 +104,7 @@ export function isOnEnergyNode(
 export function mitigatedDamage(
   mitigation: Mitigation,
   combat: CombatConfig,
+  charge = 0,
 ): number {
   const reduction =
     mitigation === "DEFEND"
@@ -111,7 +112,20 @@ export function mitigatedDamage(
       : mitigation === "DODGE_GRAZE"
         ? combat.grazedDodgeDamageReduction
         : 0;
-  return Math.max(0, Math.round(combat.attackDamage * (1 - reduction)));
+  const raw =
+    combat.attackDamage +
+    Math.max(0, Math.min(charge, combat.maxCharge)) * combat.chargeDamageBonus;
+  return Math.max(0, Math.round(raw * (1 - reduction)));
+}
+
+/** Charge after a turn: spent entirely by attacking, otherwise topped up. */
+export function nextCharge(
+  current: number,
+  attacked: boolean,
+  combat: CombatConfig,
+): number {
+  if (attacked) return 0;
+  return Math.min(combat.maxCharge, current + combat.chargeGainPerTurn);
 }
 
 export function clamp(value: number, min: number, max: number): number {

@@ -137,7 +137,26 @@ export class HeuristicAgent implements Agent {
     const canAttack = availableActions.includes("ATTACK");
     const canMove = availableActions.includes("MOVE");
 
-    // 1. Break off while there is still something left to break off with.
+    // 1. A charged opponent in range is a telegraphed big hit.
+    //
+    //    Only worth evading if they out-gun us. If we are just as charged,
+    //    evading is a losing move: neither side ever spends its charge, both
+    //    keep building it, and the fight deadlocks into a dodge loop. When
+    //    both are loaded, trade.
+    const outgunned = observation.enemy.charge > self.charge;
+    const incoming =
+      observation.enemyInAttackRange &&
+      observation.hasLineOfSightToEnemy &&
+      outgunned &&
+      observation.enemyPotentialDamage >= self.hp * 0.4;
+
+    if (incoming) {
+      const away = this.directionAwayFrom(observation);
+      if (canDodge && away) return dodge(away);
+      if (availableActions.includes("DEFEND")) return defend();
+    }
+
+    // 2. Break off while there is still something left to break off with.
     if (hurt && observation.enemyInAttackRange && canDodge) {
       const away = this.directionAwayFrom(observation);
       if (away) return dodge(away);

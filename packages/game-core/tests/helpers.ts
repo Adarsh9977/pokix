@@ -13,6 +13,7 @@ export interface PlayerOverride {
   hp?: number;
   energy?: number;
   position?: Position;
+  charge?: number;
   cooldowns?: Record<string, number>;
 }
 
@@ -51,6 +52,7 @@ export function stateWith(
       hp: override.hp ?? player.hp,
       energy: override.energy ?? player.energy,
       position: override.position ?? player.position,
+      charge: override.charge ?? player.charge,
       cooldowns: override.cooldowns ?? player.cooldowns,
     };
   }

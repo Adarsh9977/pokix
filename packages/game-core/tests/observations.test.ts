@@ -13,22 +13,40 @@ describe("self and enemy state", () => {
   });
   const observation = buildObservation(state, "A", OPEN_ARENA);
 
-  it("reports the observer's own hp, energy and position", () => {
+  it("reports the observer's own hp, energy, position and charge", () => {
     expect(observation.self).toEqual({
       id: "A",
       hp: 80,
       energy: 40,
       position: { x: 5, y: 5 },
+      charge: 0,
     });
   });
 
-  it("reports the enemy's hp and position but never their energy", () => {
+  it("reports the enemy's hp, position and charge but never their energy", () => {
+    // Charge is shared deliberately: a wound-up opponent should be a
+    // telegraphed threat, not a surprise. Energy stays hidden.
     expect(observation.enemy).toEqual({
       id: "B",
       hp: 60,
       position: { x: 6, y: 5 },
+      charge: 0,
     });
     expect(observation.enemy).not.toHaveProperty("energy");
+  });
+
+  it("spells out how hard the enemy's next hit would land", () => {
+    const charged = stateWith({
+      players: {
+        A: { position: { x: 5, y: 5 } },
+        B: { position: { x: 6, y: 5 }, charge: 3 },
+      },
+    });
+    const seen = buildObservation(charged, "A", OPEN_ARENA);
+    expect(seen.enemy.charge).toBe(3);
+    expect(seen.enemyPotentialDamage).toBe(
+      OPEN_ARENA.combat.attackDamage + 3 * OPEN_ARENA.combat.chargeDamageBonus,
+    );
   });
 
   it("carries the turn and the state version it was taken from", () => {
