@@ -340,6 +340,13 @@ export class MatchOrchestrator {
       ...(resolved.confidence === undefined
         ? {}
         : { confidence: resolved.confidence }),
+      ...(resolved.probabilities?.[resolved.action.type] === undefined
+        ? {}
+        : { probability: resolved.probabilities[resolved.action.type] }),
+      ...(resolved.model === undefined ? {} : { model: resolved.model }),
+      ...(resolved.providerRequestId === undefined
+        ? {}
+        : { providerRequestId: resolved.providerRequestId }),
       ...(failure === undefined
         ? {}
         : { error: failure.message, errorCategory: failure.category }),

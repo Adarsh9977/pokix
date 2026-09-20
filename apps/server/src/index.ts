@@ -6,6 +6,8 @@
  * and exists nowhere else.
  */
 
+export * from "./agents/jev-agent";
+export * from "./agents/jev-decision";
 export * from "./config/dotenv";
 export * from "./config/env";
 export * from "./playground/playground";
