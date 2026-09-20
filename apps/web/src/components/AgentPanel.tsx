@@ -9,11 +9,14 @@
 
 import type { AgentTurnRecord } from "@jev-arena/agent-core";
 import {
+  STRATEGY_PROFILES,
+  STRATEGY_PROFILE_IDS,
   describeAction,
   type ActionType,
   type GameConfig,
   type GameState,
   type PlayerId,
+  type StrategyProfileId,
 } from "@jev-arena/types";
 
 const ACTION_ORDER: ActionType[] = ["MOVE", "ATTACK", "DEFEND", "DODGE"];
@@ -25,6 +28,8 @@ export interface AgentPanelProps {
   readonly state: GameState;
   readonly record: AgentTurnRecord | undefined;
   readonly thinking: boolean;
+  readonly profile: StrategyProfileId;
+  readonly onProfileChange: (profile: StrategyProfileId) => void;
 }
 
 function Meter({
@@ -60,19 +65,40 @@ export function AgentPanel({
   state,
   record,
   thinking,
+  profile,
+  onProfileChange,
 }: AgentPanelProps) {
   const player = state.players[id];
   const decision = record?.decisions[id];
   const trace = record?.traces[id];
   const resolved = record?.resolution.players[id];
+  const onNode = config.arena.energyNodes.some(
+    (tile) => tile.x === player.position.x && tile.y === player.position.y,
+  );
 
   return (
     <section className={`panel panel-${id}`}>
       <header className="panel-head">
         <span className="panel-dot" />
-        <h2>{name}</h2>
+        <h2>{name.split(" · ").slice(0, 2).join(" · ")}</h2>
         {player.hp <= 0 && <span className="panel-flag down">DOWN</span>}
       </header>
+
+      <label className="profile-picker">
+        <select
+          value={profile}
+          onChange={(event) =>
+            onProfileChange(event.target.value as StrategyProfileId)
+          }
+        >
+          {STRATEGY_PROFILE_IDS.map((option) => (
+            <option key={option} value={option}>
+              {STRATEGY_PROFILES[option].label}
+            </option>
+          ))}
+        </select>
+        <small>{STRATEGY_PROFILES[profile].blurb}</small>
+      </label>
 
       <Meter
         label="HP"
@@ -84,8 +110,17 @@ export function AgentPanel({
         label="EN"
         value={player.energy}
         max={config.player.maxEnergy}
-        tone="#6b7f95"
+        tone={onNode ? "#ffd166" : "#6b7f95"}
       />
+
+      <div className="tags">
+        <span className={`tag ${onNode ? "on" : ""}`}>
+          {onNode ? "on power node" : "no node"}
+        </span>
+        {resolved && resolved.energyHarvested > 0 && (
+          <span className="tag energy">+{resolved.energyHarvested} energy</span>
+        )}
+      </div>
 
       <div className="decision">
         {thinking ? (

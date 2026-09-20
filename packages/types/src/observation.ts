@@ -31,6 +31,13 @@ export interface ObservedEnvironment {
   readonly width: number;
   readonly height: number;
   readonly obstacles: readonly Position[];
+  readonly energyNodes: readonly Position[];
+}
+
+export interface ObservedEnergyNode {
+  readonly position: Position;
+  /** Manhattan distance from the observer. */
+  readonly distance: number;
 }
 
 export interface AgentObservation {
@@ -58,6 +65,18 @@ export interface AgentObservation {
   readonly distanceToEnemy: number;
   readonly attackRange: number;
   readonly enemyInAttackRange: boolean;
+  /** False when an obstacle sits between the two players. */
+  readonly hasLineOfSightToEnemy: boolean;
+  /**
+   * The enemy is close enough to hit but cover is in the way. Worth its own
+   * field because "move to get an angle" is a different decision from
+   * "move to close distance".
+   */
+  readonly isBehindCover: boolean;
+
+  readonly standingOnEnergyNode: boolean;
+  /** Power nodes, nearest first. */
+  readonly energyNodes: readonly ObservedEnergyNode[];
 
   readonly environment: ObservedEnvironment;
 }

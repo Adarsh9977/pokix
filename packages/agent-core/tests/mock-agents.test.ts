@@ -142,12 +142,156 @@ describe("HeuristicAgent", () => {
   });
 
   it("routes around an obstacle rather than walking into it", async () => {
-    // (5,3) is an obstacle in the default layout, so SOUTH is not offered.
-    const observation = look({ x: 5, y: 2 }, { x: 6, y: 17 }, {}, config);
+    // (3,4) is an obstacle in the default layout, so SOUTH is not offered
+    // even though it is the direction that closes the larger gap.
+    const observation = look({ x: 3, y: 3 }, { x: 4, y: 17 }, {}, config);
     expect(observation.legalMoveDirections).not.toContain("SOUTH");
     const decision = await agent.decide(observation);
     expect(decision.action).toEqual(move("EAST"));
   });
+
+  it("sidesteps for an angle when the enemy is in reach but behind cover", async () => {
+    // (9,6) and (10,6) are pillars. Standing either side of one puts the
+    // enemy in range with no shot, which is a different problem from being
+    // out of range and needs a different answer.
+    const observation = look({ x: 8, y: 6 }, { x: 10, y: 6 }, {}, config);
+    expect(observation.enemyInAttackRange).toBe(true);
+    expect(observation.hasLineOfSightToEnemy).toBe(false);
+    expect(observation.isBehindCover).toBe(true);
+    expect(observation.availableActions).not.toContain("ATTACK");
+
+    const decision = await agent.decide(observation);
+    // Perpendicular to the enemy: the movement most likely to clear cover.
+    expect(decision.action.type).toBe("MOVE");
+    if (decision.action.type === "MOVE") {
+      expect(["NORTH", "SOUTH"]).toContain(decision.action.direction);
+    }
+  });
+
+  it("breaks off to take a power node when it is running dry", async () => {
+    const observation = look(
+      { x: 9, y: 5 },
+      { x: 18, y: 18 },
+      { energy: 5 },
+      config,
+    );
+    const decision = await agent.decide(observation);
+    // The nearest node is (9,2), directly north.
+    expect(decision.action).toEqual(move("NORTH"));
+  });
+
+  it("holds a node it is already standing on rather than stepping off", async () => {
+    const observation = look(
+      { x: 9, y: 2 },
+      { x: 18, y: 18 },
+      { energy: 5 },
+      config,
+    );
+    expect(observation.standingOnEnergyNode).toBe(true);
+    const decision = await agent.decide(observation);
+    expect(decision.action).not.toEqual(move("NORTH"));
+  });
+});
+
+describe("strategy profiles", () => {
+  const open: GameConfig = {
+    ...config,
+    arena: { ...config.arena, obstacles: [] },
+  };
+
+  const see = (
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    self: Partial<{ hp: number; energy: number }> = {},
+  ) => {
+    const base = createInitialState({
+      ...open,
+      startingPositions: { A: a, B: b },
+    });
+    const state = {
+      ...base,
+      players: { ...base.players, A: { ...base.players.A, ...self } },
+    };
+    return buildObservation(state, "A", open);
+  };
+
+  it("names itself after its profile", () => {
+    expect(new HeuristicAgent({ profile: "aggressive" }).name).toBe(
+      "Local (Aggressive)",
+    );
+  });
+
+  it("makes an aggressive agent keep fighting where a defensive one runs", async () => {
+    // Same wound, same position, opposite conclusions. This is the whole
+    // point of profiles: two identical policies always draw.
+    const wounded = see({ x: 5, y: 5 }, { x: 6, y: 5 }, { hp: 35 });
+
+    const aggressive = await new HeuristicAgent({
+      profile: "aggressive",
+    }).decide(wounded);
+    const defensive = await new HeuristicAgent({ profile: "defensive" }).decide(
+      wounded,
+    );
+
+    expect(aggressive.action.type).toBe("ATTACK");
+    expect(defensive.action.type).toBe("DODGE");
+  });
+
+  it("makes a defensive agent look for energy an aggressive one ignores", async () => {
+    const lowEnergy = see({ x: 9, y: 5 }, { x: 18, y: 18 }, { energy: 30 });
+
+    const aggressive = await new HeuristicAgent({
+      profile: "aggressive",
+    }).decide(lowEnergy);
+    const defensive = await new HeuristicAgent({ profile: "defensive" }).decide(
+      lowEnergy,
+    );
+
+    // 30% energy is above the aggressive threshold and below the defensive
+    // one, so they head in opposite directions from the same state.
+    expect(aggressive.action).toEqual(move("SOUTH"));
+    expect(defensive.action).toEqual(move("NORTH"));
+  });
+
+  it("keeps every profile deterministic", async () => {
+    for (const id of [
+      "neutral",
+      "aggressive",
+      "defensive",
+      "tactical",
+    ] as const) {
+      const agent = new HeuristicAgent({ profile: id });
+      const observation = see({ x: 5, y: 5 }, { x: 9, y: 9 });
+      const first = await agent.decide(observation);
+      for (let i = 0; i < 5; i += 1) {
+        expect((await agent.decide(observation)).action).toEqual(first.action);
+      }
+    }
+  });
+});
+
+describe("HeuristicAgent, continued", () => {
+  const agent = new HeuristicAgent();
+  const open: GameConfig = {
+    ...config,
+    arena: { ...config.arena, obstacles: [] },
+  };
+  const look = (
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    self: Partial<{ hp: number; energy: number }> = {},
+    cfg: GameConfig = open,
+  ) => {
+    const base = createInitialState({
+      ...cfg,
+      startingPositions: { A: a, B: b },
+    });
+    const state = {
+      ...base,
+      players: { ...base.players, A: { ...base.players.A, ...self } },
+    };
+    return buildObservation(state, "A", cfg);
+  };
 
   it("dodges away when badly hurt and threatened", async () => {
     const decision = await agent.decide(

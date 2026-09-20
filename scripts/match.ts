@@ -11,7 +11,9 @@
 import {
   DEFAULT_GAME_CONFIG,
   PLAYER_IDS,
+  STRATEGY_PROFILE_IDS,
   describeAction,
+  isStrategyProfileId,
   type GameConfig,
   type PlayerId,
 } from "@jev-arena/types";
@@ -92,6 +94,14 @@ async function main(): Promise<void> {
   const maxTurns = Number.parseInt(flag("turns") ?? "", 10);
   const timeoutMs = Number.parseInt(flag("timeout") ?? "", 10);
 
+  // Different profiles by default. Two agents with the same instructions
+  // reach the same conclusion from the same state and mirror each other into
+  // a draw, which is correct and boring.
+  const rawA = flag("a") ?? "aggressive";
+  const rawB = flag("b") ?? "tactical";
+  const profileA = isStrategyProfileId(rawA) ? rawA : "neutral";
+  const profileB = isStrategyProfileId(rawB) ? rawB : "neutral";
+
   const config: GameConfig = {
     ...DEFAULT_GAME_CONFIG,
     ...(Number.isNaN(maxTurns) ? {} : { maxTurns }),
@@ -100,7 +110,16 @@ async function main(): Promise<void> {
   let agents: Record<PlayerId, Agent>;
 
   if (useMock) {
-    agents = { A: new HeuristicAgent(), B: new HeuristicAgent() };
+    agents = {
+      A: new HeuristicAgent({
+        profile: profileA,
+        name: `Local A (${profileA})`,
+      }),
+      B: new HeuristicAgent({
+        profile: profileB,
+        name: `Local B (${profileB})`,
+      }),
+    };
   } else {
     if (!hasApiKey()) {
       console.error(
@@ -114,8 +133,14 @@ async function main(): Promise<void> {
       ...(Number.isNaN(timeoutMs) ? {} : { timeoutMs }),
     });
     agents = {
-      A: new JevAgent(gateway, { name: "Jev A" }),
-      B: new JevAgent(gateway, { name: "Jev B" }),
+      A: new JevAgent(gateway, {
+        profile: profileA,
+        name: `Jev A (${profileA})`,
+      }),
+      B: new JevAgent(gateway, {
+        profile: profileB,
+        name: `Jev B (${profileB})`,
+      }),
     };
   }
 
@@ -126,6 +151,9 @@ async function main(): Promise<void> {
   console.log(`  Agent mode  ${mode}`);
   console.log(
     `  Arena ${config.arena.width}x${config.arena.height}   turn limit ${config.maxTurns}`,
+  );
+  console.log(
+    `  Profiles ${STRATEGY_PROFILE_IDS.join(" | ")}   (--a=<id> --b=<id>)`,
   );
   if (!useMock) {
     console.log(

@@ -16,9 +16,12 @@ import {
   dodge,
   move,
   type Action,
+  STRATEGY_PROFILES,
   type AgentDecision,
   type AgentObservation,
   type Direction,
+  type StrategyProfile,
+  type StrategyProfileId,
 } from "@jev-arena/types";
 import type { Agent } from "./agent";
 
@@ -84,28 +87,38 @@ export class ScriptedAgent implements Agent {
  *
  * It reads only the observation, exactly like a Jev agent does, so it is a
  * fair baseline to measure a model against and a realistic stand-in while
- * building the UI. Its policy, in order:
+ * building the UI. Its policy, in priority order:
  *
- *   1. Badly hurt and under threat with the energy to escape? Dodge away.
- *   2. Enemy in range and attack affordable? Attack.
- *   3. Out of range? Close the larger axis gap first.
- *   4. Nothing useful available? Brace.
+ *   1. Badly hurt, under threat, and able to escape? Dodge away.
+ *   2. Low on energy with a power node reachable? Go take it.
+ *   3. Enemy in reach with a clear line? Attack.
+ *   4. Enemy in reach but behind cover? Sidestep for an angle.
+ *   5. Out of range? Close the larger axis gap first.
+ *   6. Nothing useful? Brace.
+ *
+ * The thresholds come from its strategy profile, which is what stops two of
+ * these from mirroring each other into a guaranteed draw.
  *
  * Every tie is broken by a fixed order, so the same observation always
  * produces the same action.
  */
 export class HeuristicAgent implements Agent {
   readonly name: string;
+  private readonly profile: StrategyProfile;
 
   constructor(
     private readonly options: {
-      /** HP fraction below which it starts favouring escape. */
-      readonly retreatBelowHpFraction?: number;
+      readonly profile?: StrategyProfileId | StrategyProfile;
       readonly maxHp?: number;
+      readonly maxEnergy?: number;
       readonly name?: string;
     } = {},
   ) {
-    this.name = options.name ?? "Heuristic";
+    this.profile =
+      typeof options.profile === "string"
+        ? STRATEGY_PROFILES[options.profile]
+        : (options.profile ?? STRATEGY_PROFILES.neutral);
+    this.name = options.name ?? `Local (${this.profile.label})`;
   }
 
   async decide(observation: AgentObservation): Promise<AgentDecision> {
@@ -115,22 +128,49 @@ export class HeuristicAgent implements Agent {
   private choose(observation: AgentObservation): Action {
     const { self, enemy, availableActions } = observation;
     const maxHp = this.options.maxHp ?? 100;
-    const retreatBelow = this.options.retreatBelowHpFraction ?? 0.3;
+    const maxEnergy = this.options.maxEnergy ?? 100;
 
-    const hurt = self.hp / maxHp < retreatBelow;
+    const hurt = self.hp / maxHp < this.profile.retreatBelowHpFraction;
+    const drained =
+      self.energy / maxEnergy < this.profile.seeksEnergyBelowFraction;
     const canDodge = availableActions.includes("DODGE");
     const canAttack = availableActions.includes("ATTACK");
     const canMove = availableActions.includes("MOVE");
 
+    // 1. Break off while there is still something left to break off with.
     if (hurt && observation.enemyInAttackRange && canDodge) {
       const away = this.directionAwayFrom(observation);
       if (away) return dodge(away);
     }
 
+    // 2. Running dry is a losing position, so top up before it happens.
+    // Not while standing on the node: at that point just hold it.
+    if (drained && canMove && !observation.standingOnEnergyNode) {
+      const node = observation.energyNodes[0];
+      if (node) {
+        const toNode = this.directionTowardTile(observation, node.position);
+        if (toNode) return move(toNode);
+      }
+    }
+
+    // 3. The shot is there. Take it.
     if (canAttack) return attack(enemy.id);
 
+    // 4. In reach but shooting at a pillar: step out and get the angle.
+    if (observation.isBehindCover && canMove) {
+      const sidestep = this.sidestep(observation);
+      if (sidestep) return move(sidestep);
+    }
+
+    // 5. Close, unless this profile would rather hold its spacing.
     if (canMove) {
-      const toward = this.directionToward(observation);
+      const holdingDistance =
+        this.profile.prefersDistance &&
+        observation.enemyInAttackRange &&
+        observation.hasLineOfSightToEnemy;
+      const toward = holdingDistance
+        ? this.directionAwayFrom(observation, "move")
+        : this.directionToward(observation);
       if (toward) return move(toward);
     }
 
@@ -139,8 +179,15 @@ export class HeuristicAgent implements Agent {
 
   /** Closes the larger axis gap first; falls back to any legal direction. */
   private directionToward(o: AgentObservation): Direction | undefined {
-    const dx = o.enemy.position.x - o.self.position.x;
-    const dy = o.enemy.position.y - o.self.position.y;
+    return this.directionTowardTile(o, o.enemy.position);
+  }
+
+  private directionTowardTile(
+    o: AgentObservation,
+    target: { x: number; y: number },
+  ): Direction | undefined {
+    const dx = target.x - o.self.position.x;
+    const dy = target.y - o.self.position.y;
     const preferences: Direction[] =
       Math.abs(dx) >= Math.abs(dy)
         ? [horizontal(dx), vertical(dy)].filter(isDefined)
@@ -152,8 +199,25 @@ export class HeuristicAgent implements Agent {
     );
   }
 
+  /**
+   * Steps perpendicular to the enemy, which is the movement most likely to
+   * clear a pillar without giving up distance.
+   */
+  private sidestep(o: AgentObservation): Direction | undefined {
+    const dx = o.enemy.position.x - o.self.position.x;
+    const dy = o.enemy.position.y - o.self.position.y;
+    const perpendicular: Direction[] =
+      Math.abs(dx) >= Math.abs(dy) ? ["NORTH", "SOUTH"] : ["EAST", "WEST"];
+    return perpendicular.find((d) => o.legalMoveDirections.includes(d));
+  }
+
   /** Opens the larger axis gap first; falls back to any legal direction. */
-  private directionAwayFrom(o: AgentObservation): Direction | undefined {
+  private directionAwayFrom(
+    o: AgentObservation,
+    kind: "dodge" | "move" = "dodge",
+  ): Direction | undefined {
+    const legal =
+      kind === "dodge" ? o.legalDodgeDirections : o.legalMoveDirections;
     const dx = o.self.position.x - o.enemy.position.x;
     const dy = o.self.position.y - o.enemy.position.y;
     const preferences: Direction[] =
@@ -162,8 +226,8 @@ export class HeuristicAgent implements Agent {
         : [vertical(dy), horizontal(dx)].filter(isDefined);
 
     return (
-      preferences.find((d) => o.legalDodgeDirections.includes(d)) ??
-      DIRECTIONS.find((d) => o.legalDodgeDirections.includes(d))
+      preferences.find((d) => legal.includes(d)) ??
+      DIRECTIONS.find((d) => legal.includes(d))
     );
   }
 }

@@ -42,6 +42,7 @@ export function createInitialState(config: GameConfig): GameState {
     width: config.arena.width,
     height: config.arena.height,
     obstacles: config.arena.obstacles.map((tile) => ({ ...tile })),
+    energyNodes: config.arena.energyNodes.map((tile) => ({ ...tile })),
   };
 
   return deepFreeze({

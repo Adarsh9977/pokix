@@ -20,6 +20,7 @@ import {
   attack,
   defend,
   dodge,
+  STRATEGY_PROFILES,
   isActionType,
   isDirection,
   move,
@@ -27,6 +28,7 @@ import {
   type ActionType,
   type AgentObservation,
   type Direction,
+  type StrategyProfile,
 } from "@jev-arena/types";
 import { ArenaError } from "@jev-arena/types";
 import type { JevChoiceAnswer, JevChoiceQuestion } from "../typesafe/gateway";
@@ -61,17 +63,8 @@ const DIRECTION_DESCRIPTIONS: Record<Direction, string> = {
   WEST: "Leftward on the map, decreasing x.",
 };
 
-export interface StrategyProfile {
-  readonly id: string;
-  /** Appended to the action question. Changes emphasis, never the rules. */
-  readonly directive: string;
-}
-
-export const NEUTRAL_PROFILE: StrategyProfile = {
-  id: "neutral",
-  directive:
-    "Play to win the fight. Weigh the risk of being hit against the value of landing a hit.",
-};
+/** The shared profile definition, so local and Jev agents mean the same thing. */
+export const NEUTRAL_PROFILE = STRATEGY_PROFILES.neutral;
 
 /**
  * The state handed to the model.
@@ -100,13 +93,28 @@ export function buildDecisionState(
     tactical: {
       distanceToEnemy: observation.distanceToEnemy,
       yourAttackRange: observation.attackRange,
-      enemyIsWithinYourReach: observation.enemyInAttackRange,
-      youAreWithinEnemyReach: observation.enemyInAttackRange,
+      enemyIsWithinYourReach:
+        observation.enemyInAttackRange && observation.hasLineOfSightToEnemy,
+      youAreWithinEnemyReach:
+        observation.enemyInAttackRange && observation.hasLineOfSightToEnemy,
+      // Stated separately because "they are close but I have no shot" calls
+      // for a different answer than "they are too far away".
+      clearLineOfFire: observation.hasLineOfSightToEnemy,
+      enemyIsShieldedByCover: observation.isBehindCover,
+    },
+    power: {
+      youAreStandingOnAPowerNode: observation.standingOnEnergyNode,
+      energyRestoredByANode: "a large one-off top-up",
+      nearestNodes: observation.energyNodes.slice(0, 2).map((node) => ({
+        position: node.position,
+        distance: node.distance,
+      })),
     },
     arena: {
       width: observation.environment.width,
       height: observation.environment.height,
       blockedTiles: observation.environment.obstacles,
+      powerNodes: observation.environment.energyNodes,
     },
   };
 }
@@ -122,13 +130,19 @@ export function buildDecisionQuestions(
     actionCriteria[type] = ACTION_DESCRIPTIONS[type];
   }
 
+  // Only mention cover when it is actually the thing in the way. Saying it
+  // every turn would train the model to weight it when it does not matter.
+  const coverNote = observation.isBehindCover
+    ? " The enemy is close enough to hit but an obstacle blocks the shot, which is why ATTACK is not offered; moving to clear the obstruction is an option."
+    : "";
+
   questions.push({
     id: QUESTION_IDS.action,
     instructions: {
       question:
         "You control the agent described in `you`. Which single action best serves it this turn?",
       approach: profile.directive,
-      note: "Only legal actions are listed. Range, energy and legality have already been checked, so any listed option can be taken.",
+      note: `Only legal actions are listed. Range, energy, cover and legality have already been checked, so any listed option can be taken.${coverNote}`,
     },
     criteria: actionCriteria,
   });

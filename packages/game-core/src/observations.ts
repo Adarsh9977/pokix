@@ -21,6 +21,7 @@ import {
   type PlayerId,
 } from "@jev-arena/types";
 import { validateAction } from "./actions";
+import { hasLineOfSight, isOnEnergyNode } from "./rules";
 import { deepFreeze } from "./state";
 
 export function buildObservation(
@@ -59,6 +60,24 @@ export function buildObservation(
   const availableActions = ACTION_TYPES.filter((type) => available.has(type));
 
   const distanceToEnemy = manhattanDistance(self.position, enemy.position);
+  const lineOfSight = hasLineOfSight(
+    self.position,
+    enemy.position,
+    state.environment,
+  );
+
+  // Sorted by how far away they are, so "the nearest node" is just the first
+  // entry and the agent never has to compare distances itself.
+  const energyNodes = [...state.environment.energyNodes]
+    .map((tile) => ({
+      position: { ...tile },
+      distance: manhattanDistance(self.position, tile),
+    }))
+    .sort((a, b) =>
+      a.distance === b.distance
+        ? a.position.x - b.position.x || a.position.y - b.position.y
+        : a.distance - b.distance,
+    );
 
   return deepFreeze({
     turn: state.turn,
@@ -80,10 +99,16 @@ export function buildObservation(
     distanceToEnemy,
     attackRange: config.combat.attackRange,
     enemyInAttackRange: distanceToEnemy <= config.combat.attackRange,
+    hasLineOfSightToEnemy: lineOfSight,
+    /** True when the enemy is close enough but cover is in the way. */
+    isBehindCover: distanceToEnemy <= config.combat.attackRange && !lineOfSight,
+    standingOnEnergyNode: isOnEnergyNode(self.position, state.environment),
+    energyNodes,
     environment: {
       width: state.environment.width,
       height: state.environment.height,
       obstacles: state.environment.obstacles.map((tile) => ({ ...tile })),
+      energyNodes: state.environment.energyNodes.map((tile) => ({ ...tile })),
     },
   } satisfies AgentObservation);
 }
